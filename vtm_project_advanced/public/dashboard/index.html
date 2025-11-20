@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>VtM Storyteller Control Room</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>VtM Storyteller Control Room</h1>
+    <div class="guild-input">
+      <label>Guild ID:</label>
+      <input id="guild_id" placeholder="123456789012345678" />
+      <button id="load_btn">Load</button>
+      <span id="status"></span>
+    </div>
+  </header>
+
+  <nav id="sidebar">
+    <button class="tab-btn active" data-panel="players_panel">Players</button>
+    <button class="tab-btn" data-panel="quests_panel">Quests</button>
+    <button class="tab-btn" data-panel="scenes_panel">Scenes</button>
+    <button class="tab-btn" data-panel="factions_panel">Factions</button>
+    <button class="tab-btn" data-panel="encounters_panel">Encounters</button>
+    <button class="tab-btn" data-panel="continuity_panel">Continuity</button>
+    <button class="tab-btn" data-panel="director_panel">Director</button>
+    <button class="tab-btn" data-panel="maps_panel">Maps</button>
+  </nav>
+
+  <main id="content">
+    <section id="players_panel" class="panel visible">
+      <h2>Players</h2>
+      <table id="players_table">
+        <thead>
+          <tr><th>Name</th><th>Clan</th><th>Hunger</th><th>Health</th><th>Willpower</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section id="quests_panel" class="panel">
+      <h2>Quests</h2>
+      <table id="quests_table">
+        <thead>
+          <tr><th>ID</th><th>Title</th><th>Status</th><th>Summary</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section id="scenes_panel" class="panel">
+      <h2>Scenes</h2>
+      <table id="scenes_table">
+        <thead>
+          <tr><th>ID</th><th>Title</th><th>Status</th><th>Location</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section id="factions_panel" class="panel">
+      <h2>Factions</h2>
+      <pre id="factions_raw">(Not yet wired)</pre>
+    </section>
+
+    <section id="encounters_panel" class="panel">
+      <h2>Encounters</h2>
+      <table id="encounters_table">
+        <thead>
+          <tr><th>Title</th><th>Location</th><th>Type</th><th>Severity</th><th>When</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section id="continuity_panel" class="panel">
+      <h2>Continuity</h2>
+      <table id="continuity_table">
+        <thead>
+          <tr><th>Title</th><th>Location</th><th>Status</th><th>Themes</th><th>When</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section id="director_panel" class="panel">
+      <h2>Director</h2>
+      <pre id="director_raw">(Not yet wired)</pre>
+    </section>
+
+    <section id="maps_panel" class="panel">
+      <h2>Maps</h2>
+      <pre id="maps_raw">(Not yet wired)</pre>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

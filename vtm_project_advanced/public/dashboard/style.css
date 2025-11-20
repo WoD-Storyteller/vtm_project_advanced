@@ -1,0 +1,124 @@
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #0b0b0f;
+  color: #eee;
+  display: flex;
+  height: 100vh;
+}
+header {
+  position: fixed;
+  top: 0;
+  left: 200px;
+  right: 0;
+  height: 60px;
+  background: #151520;
+  border-bottom: 1px solid #333;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 10;
+}
+header h1 {
+  font-size: 18px;
+  margin: 0;
+}
+.guild-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+#guild_id {
+  background: #0b0b10;
+  border: 1px solid #444;
+  color: #eee;
+  padding: 4px 6px;
+  border-radius: 4px;
+  width: 200px;
+}
+#load_btn {
+  background: #b30000;
+  border: none;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+#load_btn:hover {
+  background: #e60000;
+}
+#status {
+  min-width: 80px;
+  text-align: left;
+  font-size: 11px;
+  color: #aaa;
+}
+#sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 200px;
+  background: #050509;
+  border-right: 1px solid #222;
+  padding-top: 60px;
+  display: flex;
+  flex-direction: column;
+}
+.tab-btn {
+  background: none;
+  border: none;
+  color: #ccc;
+  padding: 10px 14px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  border-left: 3px solid transparent;
+}
+.tab-btn:hover {
+  background: #151520;
+}
+.tab-btn.active {
+  background: #1b1b2b;
+  color: #fff;
+  border-left-color: #b30000;
+}
+#content {
+  margin-left: 200px;
+  padding: 72px 16px 16px;
+  overflow-y: auto;
+  width: calc(100% - 200px);
+}
+.panel {
+  display: none;
+}
+.panel.visible {
+  display: block;
+}
+h2 {
+  font-size: 18px;
+  margin: 0 0 8px 0;
+  border-bottom: 1px solid #333;
+  padding-bottom: 4px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+th, td {
+  border: 1px solid #222;
+  padding: 4px 6px;
+}
+th {
+  background: #151520;
+  text-align: left;
+}
+tr:nth-child(even) {
+  background: #11111a;
+}
+tr:nth-child(odd) {
+  background: #090912;
+}
