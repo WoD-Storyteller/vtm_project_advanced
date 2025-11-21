@@ -1,0 +1,22 @@
+name: Deploy VTM Bot to GCP via SSH
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Start SSH agent and add GCP key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.GCP_SSH_KEY }}
+
+      - name: Deploy to GCP
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} 'cd /opt/vtm_bot/bot && bash deploy.sh'
