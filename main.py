@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- CONFIG ---
+# --- CONFIG --- test
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN")
 BOT_OWNER_ID = os.environ.get("BOT_OWNER_ID")
