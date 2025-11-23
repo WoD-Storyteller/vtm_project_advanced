@@ -14,9 +14,13 @@ import os
 
 load_dotenv()
 
-app = FastAPI
+app = FastAPI()
+
 add_session_middleware(app, secret_key=os.getenv("SECRET_KEY"))
 app.include_router(discord_oauth_router)
+
+# rest of your existing routes...
+
 # your existing routes continue...
 @app.get("/")
 async def root():
