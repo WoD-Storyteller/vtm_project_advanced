@@ -6,6 +6,9 @@ import os
 import google.generativeai as genai
 from utils import load_data_from_file, save_data
 from dotenv import load_dotenv
+from auth.discord_oauth import router as discord_oauth_router
+from auth.session import add_session_middleware
+import os
 
 load_dotenv()
 
