@@ -1,17 +1,26 @@
 import logging
 logging.basicConfig(level=logging.INFO)
+from fastapi import FastAPI
 import discord
 from discord.ext import commands
 import os
 import google.generativeai as genai
 from utils import load_data_from_file, save_data
 from dotenv import load_dotenv
+
 from auth.discord_oauth import router as discord_oauth_router
 from auth.session import add_session_middleware
 import os
 
 load_dotenv()
 
+app = FastAPI
+add_session_middleware(app, secret_key=os.getenv("SECRET_KEY"))
+app.include_router(discord_oauth_router)
+# your existing routes continue...
+@app.get("/")
+async def root():
+    return {"message": "hello"}
 # --- CONFIG --- test
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN")
@@ -79,6 +88,6 @@ async def on_ready():
     print(f'Logged in as {bot.user}')
     print(f'Bot Owner ID: {bot.owner_id}')
     print(f'Tracking {len(bot.data_store.get("guilds", {}))} servers.')
-
+ 
 if __name__ == "__main__":
     bot.run(DISCORD_BOT_TOKEN)
