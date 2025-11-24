@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>VtM Player Character Sheet</title>
+  <link rel="stylesheet" href="css/player.css" />
+</head>
+<body>
+  <div id="top_bar">
+    <div id="avatar_box">
+      <img id="avatar_img" src="" alt="Avatar">
+    </div>
+    <div class="top-bar-text">
+      <div id="user_banner"></div>
+      <div id="role_switch"></div>
+    </div>
+  </div>
+
+  <main>
+    <header id="player_header">
+      <div id="char_selector">
+        <label>Character</label>
+        <select id="character_select"></select>
+        <button id="new_char_btn">New Character</button>
+      </div>
+    </header>
+
+    <nav id="tabs">
+      <button class="tab-button active" data-target="tab_basics">Basics</button>
+      <button class="tab-button" data-target="tab_attributes">Attributes</button>
+      <button class="tab-button" data-target="tab_skills">Skills</button>
+      <button class="tab-button" data-target="tab_disciplines">Disciplines</button>
+      <button class="tab-button" data-target="tab_health">Health / Willpower / Hunger</button>
+      <button class="tab-button" data-target="tab_inventory">Inventory</button>
+      <button class="tab-button" data-target="tab_boons">Boons</button>
+      <button class="tab-button" data-target="tab_xp">XP</button>
+      <button class="tab-button" data-target="tab_rolls">Rolls</button>
+      <button class="tab-button" data-target="tab_requests">Requests</button>
+    </nav>
+
+    <section id="portrait_section">
+      <img id="portrait_img" src="" alt="Portrait">
+      <div>
+        <input type="file" id="portrait_input" accept="image/*" />
+        <button id="upload_portrait_btn">Upload Portrait</button>
+      </div>
+    </section>
+
+    <section id="tab_basics" class="tab-pane visible">
+      <h2>Basics</h2>
+      <div class="grid">
+        <div class="field">
+          <label>Name</label>
+          <input id="input_name" />
+        </div>
+        <div class="field">
+          <label>Clan</label>
+          <input id="input_clan" />
+        </div>
+        <div class="field">
+          <label>Generation</label>
+          <input id="input_gen" />
+        </div>
+        <div class="field">
+          <label>Concept</label>
+          <input id="input_concept" />
+        </div>
+        <div class="field">
+          <label>Predator Type</label>
+          <input id="input_predator" />
+        </div>
+        <div class="field">
+          <label>Chronicle</label>
+          <input id="input_chronicle" />
+        </div>
+        <div class="field">
+          <label>Sire</label>
+          <input id="input_sire" />
+        </div>
+        <div class="field wide">
+          <label>Ambitions / Touchstones</label>
+          <textarea id="input_ambitions"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab_attributes" class="tab-pane">
+      <h2>Attributes</h2>
+      <div class="grid three-cols">
+        <div>
+          <h3>Physical</h3>
+          <label>Strength</label><input id="attr_strength" type="number" min="0" max="5" />
+          <label>Dexterity</label><input id="attr_dexterity" type="number" min="0" max="5" />
+          <label>Stamina</label><input id="attr_stamina" type="number" min="0" max="5" />
+        </div>
+        <div>
+          <h3>Social</h3>
+          <label>Charisma</label><input id="attr_charisma" type="number" min="0" max="5" />
+          <label>Manipulation</label><input id="attr_manipulation" type="number" min="0" max="5" />
+          <label>Composure</label><input id="attr_composure" type="number" min="0" max="5" />
+        </div>
+        <div>
+          <h3>Mental</h3>
+          <label>Intelligence</label><input id="attr_intelligence" type="number" min="0" max="5" />
+          <label>Wits</label><input id="attr_wits" type="number" min="0" max="5" />
+          <label>Resolve</label><input id="attr_resolve" type="number" min="0" max="5" />
+        </div>
+      </div>
+    </section>
+
+    <section id="tab_skills" class="tab-pane">
+      <h2>Skills</h2>
+      <div class="grid three-cols" id="skills_grid">
+      </div>
+    </section>
+
+    <section id="tab_disciplines" class="tab-pane">
+      <h2>Disciplines & Powers</h2>
+      <div id="disciplines_list"></div>
+      <button id="add_discipline_btn">Add Discipline</button>
+    </section>
+
+    <section id="tab_health" class="tab-pane">
+      <h2>Health / Willpower / Hunger</h2>
+      <div class="grid">
+        <div class="field">
+          <h3>Health</h3>
+          <label>Max</label><input id="health_max" type="number" />
+          <label>Superficial</label><input id="health_sup" type="number" />
+          <label>Aggravated</label><input id="health_agg" type="number" />
+        </div>
+        <div class="field">
+          <h3>Willpower</h3>
+          <label>Max</label><input id="wp_max" type="number" />
+          <label>Superficial</label><input id="wp_sup" type="number" />
+          <label>Aggravated</label><input id="wp_agg" type="number" />
+        </div>
+        <div class="field">
+          <h3>Hunger</h3>
+          <label>Current Hunger</label><input id="hunger" type="number" min="0" max="5" />
+        </div>
+      </div>
+    </section>
+
+    <section id="tab_inventory" class="tab-pane">
+      <h2>Inventory</h2>
+      <textarea id="input_inventory" placeholder="Free-form inventory notes or JSON-style list..."></textarea>
+    </section>
+
+    <section id="tab_boons" class="tab-pane">
+      <h2>Boons</h2>
+      <textarea id="input_boons" placeholder="List of boons owed, owed by, and details..."></textarea>
+    </section>
+
+    <section id="tab_xp" class="tab-pane">
+      <h2>Experience</h2>
+      <div class="grid">
+        <div class="field">
+          <label>Total XP</label><input id="xp_total" type="number" readonly />
+        </div>
+        <div class="field">
+          <label>Spent XP</label><input id="xp_spent" type="number" readonly />
+        </div>
+        <div class="field">
+          <label>Unspent XP</label><input id="xp_unspent" type="number" readonly />
+        </div>
+      </div>
+      <h3>XP Log</h3>
+      <pre id="xp_log"></pre>
+      <h3>Add XP</h3>
+      <label>Amount</label><input id="xp_add_amount" type="number" />
+      <label>Reason</label><input id="xp_add_reason" />
+      <label>Session</label><input id="xp_add_session" />
+      <button id="xp_add_btn">Add XP</button>
+      <pre id="xp_status"></pre>
+    </section>
+
+    <section id="tab_rolls" class="tab-pane">
+      <h2>Rolls</h2>
+      <label>Dice Pool</label><input id="roll_pool" type="number" min="1" />
+      <label>Hunger Dice</label><input id="roll_hunger" type="number" min="0" max="5" />
+      <button id="roll_btn">Roll</button>
+      <h3>Result</h3>
+      <pre id="roll_result"></pre>
+    </section>
+
+    <section id="tab_requests" class="tab-pane">
+      <h2>Request to Storyteller</h2>
+      <label>Subject</label><input id="req_subject" placeholder="Downtime Action, Hunt, Scene Request..." />
+      <label>Details</label><textarea id="req_detail"></textarea>
+      <button id="req_send_btn">Send Request</button>
+      <pre id="req_status"></pre>
+    </section>
+
+    <button id="save_btn">Save Character</button>
+    <pre id="save_status"></pre>
+  </main>
+
+  <script src="js/player.js"></script>
+</body>
+</html>

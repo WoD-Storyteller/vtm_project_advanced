@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>VtM Storyteller Control Room</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="top_bar">
+    <div id="avatar_box">
+      <img id="avatar_img" src="" alt="Avatar">
+    </div>
+    <div class="top-bar-text">
+      <div id="user_banner"></div>
+      <div id="role_switch"></div>
+    </div>
+  </div>
+
+  <main>
+    <section id="guild_section">
+      <label for="guild_id">Guild ID</label>
+      <input id="guild_id" placeholder="Enter Discord Server (Guild) ID" />
+      <button id="load_all_btn">Load All Panels</button>
+    </section>
+
+    <nav id="tabs">
+      <button class="tab-button active" data-target="panel_director">Director</button>
+      <button class="tab-button" data-target="panel_scenes">Scenes</button>
+      <button class="tab-button" data-target="panel_characters">Characters</button>
+      <button class="tab-button" data-target="panel_requests">Requests</button>
+      <button class="tab-button" data-target="panel_dice">Dice Log</button>
+    </nav>
+
+    <section id="panel_director" class="panel visible">
+      <h2>Director (City AI)</h2>
+      <div class="row">
+        <button id="director_refresh_btn">Refresh Director State</button>
+        <button id="director_awaken_btn">Awaken Emissary of Caine</button>
+        <button id="director_sleep_btn">Put Emissary to Sleep</button>
+      </div>
+      <h3>Upload Director JSON</h3>
+      <input type="file" id="director_json_input" accept=".json" />
+      <button id="upload_director_btn">Upload</button>
+
+      <h3>Current Director State</h3>
+      <pre id="director_raw">(click Refresh)</pre>
+
+      <h3>Caine Phase Status</h3>
+      <pre id="director_caine_status"></pre>
+    </section>
+
+    <section id="panel_scenes" class="panel">
+      <h2>Scenes</h2>
+      <label>Location Key</label>
+      <input id="scene_location" placeholder="e.g. canterbury_cathedral" />
+      <label>Travelers (comma-separated character IDs)</label>
+      <input id="scene_travelers" placeholder="victoria_hale,alex_ross" />
+      <label>Risk (1-5)</label>
+      <input id="scene_risk" type="number" min="1" max="5" value="2" />
+      <button id="generate_scene_btn">Generate Scene</button>
+      <h3>Scene Result</h3>
+      <pre id="scene_result"></pre>
+    </section>
+
+    <section id="panel_characters" class="panel">
+      <h2>Characters Overview</h2>
+      <button id="load_characters_btn">Load Characters</button>
+      <h3>All Characters in Guild</h3>
+      <pre id="characters_list"></pre>
+    </section>
+
+    <section id="panel_requests" class="panel">
+      <h2>Player Requests</h2>
+      <button id="load_requests_btn">Load Requests</button>
+      <h3>Requests</h3>
+      <pre id="requests_list"></pre>
+      <label>Resolve Request Index</label>
+      <input id="resolve_request_index" type="number" min="0" />
+      <button id="resolve_request_btn">Resolve</button>
+      <pre id="requests_status"></pre>
+    </section>
+
+    <section id="panel_dice" class="panel">
+      <h2>Dice History</h2>
+      <button id="load_dice_btn">Load Dice History</button>
+      <pre id="dice_history"></pre>
+    </section>
+  </main>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
