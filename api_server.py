@@ -1,34 +1,34 @@
-"""
-FastAPI backend for VtM Storyteller / Player dashboards.
+#"""
+#FastAPI backend for VtM Storyteller / Player dashboards.
 
-This file is designed to be a self-contained, modern replacement for the old
-`api_server.py`, while still using the existing data layer in `utils.py`.
+#This file is designed to be a self-contained, modern replacement for the old
+#`api_server.py`, while still using the existing data layer in `utils.py`.
 
-It provides:
+#It provides:
 
-- Discord OAuth login (/auth/login, /auth/callback)
-- Session token endpoint (/auth/session) used by the dashboards
-- Player character CRUD + XP + portrait upload
-- Storyteller tools:
-    - Director state (with optional "Emissary of Caine" awakening)
-    - Scene generation stub (connect to AI Director later if desired)
-    - Guild-wide character overview
-    - Player → ST requests list + resolve
-    - Dice roller + dice history log
-- Static mounts for:
-    - /dashboard   → HTML / JS / CSS dashboards
-    - /portraits   → uploaded character portraits
+#- Discord OAuth login (/auth/login, /auth/callback)
+#- Session token endpoint (/auth/session) used by the dashboards
+#- Player character CRUD + XP + portrait upload
+#- Storyteller tools:
+#   - Director state (with optional "Emissary of Caine" awakening)
+#    - Scene generation stub (connect to AI Director later if desired)
+#    - Guild-wide character overview
+#    - Player → ST requests list + resolve
+#    - Dice roller + dice history log
+#- Static mounts for:
+#    - /dashboard   → HTML / JS / CSS dashboards
+#    - /portraits   → uploaded character portraits
 
-You can run this with e.g.:
+#You can run this with e.g.:
 
-    uvicorn api_server:app --host 0.0.0.0 --port 8000
+ #   uvicorn api_server:app --host 0.0.0.0 --port 8000
 
-Make sure you have environment variables set:
+#Make sure you have environment variables set:
 
-    DISCORD_CLIENT_ID
-    DISCORD_CLIENT_SECRET
-    DISCORD_REDIRECT_URI     (e.g. "https://yourdomain.com/auth/callback")
-    JWT_SECRET               (any long random string)
+#    DISCORD_CLIENT_ID
+#    DISCORD_CLIENT_SECRET
+#    DISCORD_REDIRECT_URI     (e.g. "https://yourdomain.com/auth/callback")
+#    JWT_SECRET               (any long random string)
 
 """
 
