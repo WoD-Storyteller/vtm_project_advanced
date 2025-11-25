@@ -8,7 +8,7 @@ import google.generativeai as genai
 from utils import load_data_from_file, save_data
 from dotenv import load_dotenv
 
-from auth.discord_oauth import router as discord_oauth_router
+from auth_routes import router as auth_router
 from auth.session import add_session_middleware
 import os
 
@@ -17,7 +17,7 @@ load_dotenv()
 app = FastAPI()
 
 add_session_middleware(app, secret_key=os.getenv("SECRET_KEY"))
-app.include_router(discord_oauth_router)
+app.include_router(auth_router)
 
 # rest of your existing routes...
 

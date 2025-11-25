@@ -30,7 +30,7 @@
 #    DISCORD_REDIRECT_URI     (e.g. "https://yourdomain.com/auth/callback")
 #    JWT_SECRET               (any long random string)
 
-"""
+
 
 import os
 import time
