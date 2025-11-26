@@ -15,8 +15,8 @@ from director_system.hooks import apply_travel_event
         await ctx.send("🔄 Syncing zones from Google Sheets…")
 
         # ---- CONFIG ----
-        SHEET_ID = "YOUR_SHEET_ID_HERE"
-        SERVICE_ACCOUNT_KEY = "configs/service_account.json"
+        SHEET_ID = "maps_sheet"
+        SERVICE_ACCOUNT_KEY = "/opt/vtm_bot/bot/configs/just-sunrise-398717-bf23770e7b50.json"
         # ----------------
 
         try:
