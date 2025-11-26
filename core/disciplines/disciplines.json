@@ -1,0 +1,364 @@
+{
+  "disciplines": {
+    "potence": {
+      "name": "Potence",
+      "summary": "Supernatural strength and raw physical power.",
+      "clans": ["Brujah", "Nosferatu", "Lasombra", "Caitiff"],
+      "powers": [
+        {
+          "level": 1,
+          "name": "Lethal Body",
+          "type": "passive",
+          "tags": ["combat", "melee", "damage"],
+          "rouse_cost": 0,
+          "duration": "constant",
+          "summary": "Your unarmed attacks count as lethal, able to maim and break bone.",
+          "effects": {
+            "damage_type_override": "superficial_to_aggravated_unarmed"
+          }
+        },
+        {
+          "level": 1,
+          "name": "Soaring Leap",
+          "type": "utility",
+          "tags": ["movement"],
+          "rouse_cost": 0,
+          "duration": "scene",
+          "summary": "You can leap inhuman distances vertically and horizontally.",
+          "effects": {}
+        },
+        {
+          "level": 2,
+          "name": "Brutal Strength",
+          "type": "passive",
+          "tags": ["combat", "melee"],
+          "rouse_cost": 0,
+          "duration": "constant",
+          "summary": "Your raw power lets you tear doors and obstacles apart.",
+          "effects": {
+            "strength_rolls_bonus": 2
+          }
+        },
+        {
+          "level": 3,
+          "name": "Spark of Rage",
+          "type": "active",
+          "tags": ["social", "mass", "frenzy"],
+          "rouse_cost": 1,
+          "duration": "instant",
+          "summary": "Incites violent rage in those around you, including other vampires.",
+          "effects": {
+            "trigger_frenzy_test": true
+          }
+        }
+      ]
+    },
+
+    "celerity": {
+      "name": "Celerity",
+      "summary": "Supernatural speed, agility, and reflexes.",
+      "clans": ["Brujah", "Toreador", "Banu Haqim"],
+      "powers": [
+        {
+          "level": 1,
+          "name": "Cat's Grace",
+          "type": "passive",
+          "tags": ["movement", "defense"],
+          "rouse_cost": 0,
+          "duration": "constant",
+          "summary": "You move with inhuman balance and poise.",
+          "effects": {
+            "dexterity_rolls_bonus": 1
+          }
+        },
+        {
+          "level": 1,
+          "name": "Rapid Reflexes",
+          "type": "passive",
+          "tags": ["combat", "initiative"],
+          "rouse_cost": 0,
+          "duration": "constant",
+          "summary": "React almost before threats appear, reducing ranged penalties.",
+          "effects": {
+            "initiative_bonus": 2
+          }
+        },
+        {
+          "level": 2,
+          "name": "Fleetness",
+          "type": "active",
+          "tags": ["movement", "combat"],
+          "rouse_cost": 1,
+          "duration": "scene",
+          "summary": "You move at blurring speeds, becoming hard to pin down.",
+          "effects": {
+            "defense_bonus": 1,
+            "dexterity_rolls_bonus": 1
+          }
+        },
+        {
+          "level": 3,
+          "name": "Blink",
+          "type": "active",
+          "tags": ["movement", "positioning", "combat"],
+          "rouse_cost": 1,
+          "duration": "instant",
+          "summary": "You close distance in a heartbeat, appearing next to your target.",
+          "effects": {
+            "ignore_range_band": true
+          }
+        }
+      ]
+    },
+
+    "fortitude": {
+      "name": "Fortitude",
+      "summary": "Unnatural resilience and ability to ignore harm.",
+      "clans": ["Ventrue", "Hecata", "Gangrel", "Ravnos"],
+      "powers": [
+        {
+          "level": 1,
+          "name": "Resilience",
+          "type": "passive",
+          "tags": ["defense", "soak"],
+          "rouse_cost": 0,
+          "duration": "constant",
+          "summary": "Your flesh resists blows beyond a normal vampire.",
+          "effects": {
+            "fortitude_flat_reduction": 1
+          }
+        },
+        {
+          "level": 2,
+          "name": "Toughness",
+          "type": "active",
+          "tags": ["defense"],
+          "rouse_cost": 1,
+          "duration": "scene",
+          "summary": "You shrug off damage that would cripple others.",
+          "effects": {
+            "fortitude_flat_reduction": 2
+          }
+        }
+      ]
+    },
+
+    "protean": {
+      "name": "Protean",
+      "summary": "Shape-shifting, claws, and animalistic transformation.",
+      "clans": ["Gangrel", "Banu Haqim"],
+      "powers": [
+        {
+          "level": 1,
+          "name": "Eyes of the Beast",
+          "type": "passive",
+          "tags": ["senses"],
+          "rouse_cost": 0,
+          "duration": "constant",
+          "summary": "See in darkness like a predator.",
+          "effects": {}
+        },
+        {
+          "level": 2,
+          "name": "Feral Weapons",
+          "type": "active",
+          "tags": ["combat", "melee", "claws"],
+          "rouse_cost": 1,
+          "duration": "scene",
+          "summary": "Your nails lengthen into deadly claws.",
+          "effects": {
+            "enable_weapon": "Feral Claws"
+          }
+        },
+        {
+          "level": 3,
+          "name": "Shapechange",
+          "type": "active",
+          "tags": ["movement", "stealth", "combat"],
+          "rouse_cost": 1,
+          "duration": "scene",
+          "summary": "Become a bestial form suited for travel or hunting.",
+          "effects": {}
+        }
+      ]
+    },
+
+    "auspex": {
+      "name": "Auspex",
+      "summary": "Heightened senses and supernatural perception.",
+      "clans": ["Toreador", "Malkavian", "Hecata", "Banu Haqim"],
+      "powers": [
+        {
+          "level": 1,
+          "name": "Heightened Senses",
+          "type": "passive",
+          "tags": ["senses", "utility"],
+          "rouse_cost": 0,
+          "duration": "constant",
+          "summary": "Sharply increases all senses, especially in darkness.",
+          "effects": {
+            "awareness_bonus": 2
+          }
+        },
+        {
+          "level": 2,
+          "name": "Premonition",
+          "type": "active",
+          "tags": ["mystic", "story"],
+          "rouse_cost": 1,
+          "duration": "instant",
+          "summary": "Brief flashes of insight about danger or opportunity.",
+          "effects": {}
+        }
+      ]
+    },
+
+    "dominate": {
+      "name": "Dominate",
+      "summary": "Direct mental control over others.",
+      "clans": ["Ventrue", "Banu Haqim"],
+      "powers": [
+        {
+          "level": 1,
+          "name": "Command",
+          "type": "active",
+          "tags": ["social", "mind_control"],
+          "rouse_cost": 0,
+          "duration": "instant",
+          "summary": "Issue a one-word mental compulsion.",
+          "effects": {}
+        },
+        {
+          "level": 2,
+          "name": "Mesmerize",
+          "type": "active",
+          "tags": ["social", "mind_control", "story"],
+          "rouse_cost": 1,
+          "duration": "short",
+          "summary": "Place simple, lingering instructions into a victim's mind.",
+          "effects": {}
+        }
+      ]
+    },
+
+    "presence": {
+      "name": "Presence",
+      "summary": "Supernatural charm, terror, and crowd control.",
+      "clans": ["Toreador", "Ventrue"],
+      "powers": [
+        {
+          "level": 1,
+          "name": "Awe",
+          "type": "active",
+          "tags": ["social"],
+          "rouse_cost": 0,
+          "duration": "scene",
+          "summary": "Everyone near you feels drawn and fascinated.",
+          "effects": {
+            "social_bonus": 2
+          }
+        },
+        {
+          "level": 2,
+          "name": "Dread Gaze",
+          "type": "active",
+          "tags": ["social", "fear"],
+          "rouse_cost": 1,
+          "duration": "instant",
+          "summary": "Instill supernatural fear and submission.",
+          "effects": {
+            "force_morale_check": true
+          }
+        }
+      ]
+    },
+
+    "obfuscate": {
+      "name": "Obfuscate",
+      "summary": "Vanish, hide in plain sight, or appear unremarkable.",
+      "clans": ["Nosferatu", "Malkavian", "Ministry"],
+      "powers": [
+        {
+          "level": 1,
+          "name": "Cloak of Shadows",
+          "type": "passive",
+          "tags": ["stealth"],
+          "rouse_cost": 0,
+          "duration": "constant",
+          "summary": "You vanish when still and in minimal cover.",
+          "effects": {}
+        },
+        {
+          "level": 2,
+          "name": "Unseen Passage",
+          "type": "active",
+          "tags": ["stealth", "movement"],
+          "rouse_cost": 1,
+          "duration": "scene",
+          "summary": "Move while remaining invisible to most observers.",
+          "effects": {}
+        }
+      ]
+    },
+
+    "animalism": {
+      "name": "Animalism",
+      "summary": "Command beasts and stir the Beast in others.",
+      "clans": ["Gangrel", "Nosferatu"],
+      "powers": [
+        {
+          "level": 1,
+          "name": "Bond Famulus",
+          "type": "active",
+          "tags": ["story", "companion"],
+          "rouse_cost": 0,
+          "duration": "long",
+          "summary": "Create a mystic bond with an animal servant.",
+          "effects": {}
+        },
+        {
+          "level": 2,
+          "name": "Feral Whispers",
+          "type": "active",
+          "tags": ["communication", "beasts"],
+          "rouse_cost": 0,
+          "duration": "scene",
+          "summary": "Speak with animals and read their impressions.",
+          "effects": {}
+        }
+      ]
+    },
+
+    "blood_sorcery": {
+      "name": "Blood Sorcery",
+      "summary": "Ritual magic fueled by vitae and will.",
+      "clans": ["Banu Haqim", "Tremere", "Hecata"],
+      "powers": [
+        {
+          "level": 1,
+          "name": "Scorpion's Touch",
+          "type": "active",
+          "tags": ["combat", "poison"],
+          "rouse_cost": 1,
+          "duration": "instant",
+          "summary": "Your blood becomes caustic, burning or weakening those it touches.",
+          "effects": {
+            "add_aggravated_if_blood_contact": true
+          }
+        },
+        {
+          "level": 2,
+          "name": "Extinguish Vitae",
+          "type": "active",
+          "tags": ["anti_vampire"],
+          "rouse_cost": 1,
+          "duration": "instant",
+          "summary": "Suppress the vigor of another vampire's blood.",
+          "effects": {
+            "reduce_hunger_or_dice": true
+          }
+        }
+      ]
+    }
+  }
+}
