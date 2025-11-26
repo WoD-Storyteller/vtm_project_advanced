@@ -1,0 +1,93 @@
+{
+  "rituals": [
+    {
+      "name": "Ward Against Kindred",
+      "level": 2,
+      "discipline": "Blood Sorcery",
+      "tags": ["ward", "defensive", "anti_vampire"],
+      "casting_time": "1 hour",
+      "rouse_cost": 1,
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "difficulty": 3,
+      "ingredients": [
+        "The caster's vitae",
+        "Symbolic representation of the warded area",
+        "A personal item from a vampire or a drop of their blood"
+      ],
+      "duration": "one story or until breached",
+      "summary": "Enchants an object or threshold so that vampires crossing it suffer harm or are repelled.",
+      "mechanical_effect": "Vampires crossing the ward must test Resolve + Composure (diff 3) or take 1-2 aggravated damage and be pushed back."
+    },
+    {
+      "name": "Blood Walk",
+      "level": 2,
+      "discipline": "Blood Sorcery",
+      "tags": ["divination", "lineage"],
+      "casting_time": "30 minutes",
+      "rouse_cost": 1,
+      "dice_pool": "Intelligence + Blood Sorcery",
+      "difficulty": 3,
+      "ingredients": [
+        "A sample of the subject's blood",
+        "A reflective surface or bowl of water"
+      ],
+      "duration": "scene",
+      "summary": "Reveals information about a vampire's lineage and blood resonance.",
+      "mechanical_effect": "On success, storyteller reveals sire, clan, generation range, and notable blood-related conditions."
+    },
+    {
+      "name": "Cleansing Rite",
+      "level": 1,
+      "discipline": "Blood Sorcery",
+      "tags": ["purification", "support"],
+      "casting_time": "15 minutes",
+      "rouse_cost": 1,
+      "dice_pool": "Resolve + Blood Sorcery",
+      "difficulty": 3,
+      "ingredients": [
+        "A shallow bowl",
+        "The caster's vitae",
+        "Herbs or incense symbolic of purification"
+      ],
+      "duration": "instant",
+      "summary": "Purifies blood or an object of lingering spiritual or occult contamination.",
+      "mechanical_effect": "Removes minor blood curses, weak poisons, or occult taint at ST discretion."
+    },
+    {
+      "name": "Taste of Future Blood",
+      "level": 3,
+      "discipline": "Blood Sorcery",
+      "tags": ["divination", "prophecy"],
+      "casting_time": "1 hour",
+      "rouse_cost": 2,
+      "dice_pool": "Resolve + Blood Sorcery",
+      "difficulty": 4,
+      "ingredients": [
+        "The caster's vitae",
+        "Fresh mortal blood from someone symbolically linked to the question",
+        "A focus symbolic of the future event"
+      ],
+      "duration": "scene",
+      "summary": "By drinking a symbolic mixture of blood, the caster glimpses potential futures related to the subject.",
+      "mechanical_effect": "On success, the storyteller provides omens, visions, or mechanical advantage (e.g., +2 dice on one relevant roll in the future scene)."
+    },
+    {
+      "name": "Binding Oath",
+      "level": 3,
+      "discipline": "Blood Sorcery",
+      "tags": ["binding", "social", "oath"],
+      "casting_time": "1 hour",
+      "rouse_cost": 1,
+      "dice_pool": "Charisma + Blood Sorcery",
+      "difficulty": 4,
+      "ingredients": [
+        "All participants' blood mixed together",
+        "A written or spoken statement of the oath",
+        "A symbolic token for each participant"
+      ],
+      "duration": "months or until broken",
+      "summary": "Binds participants to a sworn oath under mystical consequence.",
+      "mechanical_effect": "Breaking the oath inflicts stains, willpower damage, or a minor curse decided by the storyteller."
+    }
+  ]
+}
