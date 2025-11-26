@@ -1,37 +1,48 @@
 import discord
 from discord.ext import commands
-from core.combat import CombatEngine, Combatant
+from core.combat.combat_manager import CombatManager
+from core.weapons.weapon_loader import load_weapons
+
+weapons = load_weapons()
+manager = CombatManager()
 
 class CombatCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.combat_sessions = {}
 
-    @commands.group(name="combat", invoke_without_command=True)
+    @commands.group(name="combat")
     async def combat(self, ctx):
-        await ctx.reply("Use: !combat start, !combat end")
+        if ctx.invoked_subcommand is None:
+            await ctx.reply("Use: !combat start <enemy>, !combat end, !attack <target> <weapon>")
 
     @combat.command(name="start")
     async def combat_start(self, ctx, *, enemy):
-        engine = CombatEngine()
-        pc = Combatant(ctx.author.display_name)
-        npc = Combatant(enemy, npc=True)
-        engine.add_combatant(pc)
-        engine.add_combatant(npc)
-        self.combat_sessions[ctx.channel.id] = engine
-        await ctx.send(f"Combat started between **{pc.name}** and **{enemy}**.")
+        session = manager.start(ctx.channel.id, ctx.author.display_name, enemy)
+        await ctx.send(f"Combat started with **{enemy}**.")
 
     @commands.command(name="attack")
-    async def attack(self, ctx, *, target):
-        engine = self.combat_sessions.get(ctx.channel.id)
-        if not engine:
+    async def attack(self, ctx, target, *, weapon_name):
+        session = manager.get(ctx.channel.id)
+        if not session:
             return await ctx.reply("No combat active.")
-        log = engine.attack(ctx.author.display_name, target)
-        await ctx.send("\n".join(log))
+
+        weapon = weapons.get(weapon_name.lower())
+        if not weapon:
+            return await ctx.reply(f"Weapon not found: {weapon_name}")
+
+        result = session.attack(ctx.author.display_name, target, weapon)
+        await ctx.send(result)
+
+    @combat.command(name="status")
+    async def combat_status(self, ctx):
+        session = manager.get(ctx.channel.id)
+        if not session:
+            return await ctx.reply("No combat active.")
+        await ctx.reply(session.status())
 
     @combat.command(name="end")
     async def combat_end(self, ctx):
-        self.combat_sessions.pop(ctx.channel.id, None)
+        manager.end(ctx.channel.id)
         await ctx.send("Combat ended.")
 
 async def setup(bot):
