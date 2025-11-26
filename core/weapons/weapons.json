@@ -3,44 +3,200 @@
     {
       "name": "Fists",
       "type": "melee",
-      "dice": 1,
-      "damage": "superficial",
-      "traits": ["brawl"]
+      "base_dice": 1,
+      "damage_type": "superficial",
+      "traits": ["brawl", "unarmed"]
     },
     {
-      "name": "Switchblade",
+      "name": "Kick",
       "type": "melee",
-      "dice": 2,
-      "damage": "superficial",
+      "base_dice": 2,
+      "damage_type": "superficial",
+      "traits": ["brawl", "unarmed", "heavy"]
+    },
+    {
+      "name": "Improvised Weapon",
+      "type": "melee",
+      "base_dice": 1,
+      "damage_type": "superficial",
+      "traits": ["melee", "improvised"]
+    },
+    {
+      "name": "Knife",
+      "type": "melee",
+      "base_dice": 2,
+      "damage_type": "superficial",
       "traits": ["melee", "concealable"]
+    },
+    {
+      "name": "Stake",
+      "type": "melee",
+      "base_dice": 2,
+      "damage_type": "superficial",
+      "traits": ["melee", "wood", "stake"]
+    },
+    {
+      "name": "Machete",
+      "type": "melee",
+      "base_dice": 3,
+      "damage_type": "superficial",
+      "traits": ["melee", "chopping"]
+    },
+    {
+      "name": "Sword",
+      "type": "melee",
+      "base_dice": 3,
+      "damage_type": "superficial",
+      "traits": ["melee", "lethal"]
     },
     {
       "name": "Katana",
       "type": "melee",
-      "dice": 3,
-      "damage": "aggravated",
-      "traits": ["melee", "lethal"]
+      "base_dice": 4,
+      "damage_type": "aggravated",
+      "traits": ["melee", "lethal", "sharp"]
     },
     {
-      "name": "Pistol",
+      "name": "Baseball Bat",
+      "type": "melee",
+      "base_dice": 3,
+      "damage_type": "superficial",
+      "traits": ["melee", "blunt"]
+    },
+    {
+      "name": "Crowbar",
+      "type": "melee",
+      "base_dice": 3,
+      "damage_type": "superficial",
+      "traits": ["melee", "blunt", "heavy"]
+    },
+    {
+      "name": "Fire Axe",
+      "type": "melee",
+      "base_dice": 4,
+      "damage_type": "aggravated",
+      "traits": ["melee", "heavy", "sharp"]
+    },
+
+    /* ---------------------- FIREARMS ---------------------- */
+
+    {
+      "name": "Light Pistol",
       "type": "ranged",
-      "dice": 3,
-      "damage": "superficial",
-      "traits": ["ranged", "firearm", "loud"]
+      "base_dice": 2,
+      "damage_type": "superficial",
+      "traits": ["firearm", "handgun", "concealable"]
+    },
+    {
+      "name": "Heavy Pistol",
+      "type": "ranged",
+      "base_dice": 3,
+      "damage_type": "superficial",
+      "traits": ["firearm", "handgun"]
+    },
+    {
+      "name": "Revolver",
+      "type": "ranged",
+      "base_dice": 3,
+      "damage_type": "superficial",
+      "traits": ["firearm", "handgun", "loud"]
+    },
+    {
+      "name": "SMG",
+      "type": "ranged",
+      "base_dice": 4,
+      "damage_type": "superficial",
+      "traits": ["firearm", "automatic", "loud"]
+    },
+    {
+      "name": "Assault Rifle",
+      "type": "ranged",
+      "base_dice": 5,
+      "damage_type": "superficial",
+      "traits": ["firearm", "rifle", "automatic", "loud"]
     },
     {
       "name": "Shotgun",
       "type": "ranged",
-      "dice": 4,
-      "damage": "superficial",
-      "traits": ["ranged", "firearm", "scatter"]
+      "base_dice": 6,
+      "damage_type": "superficial",
+      "traits": ["firearm", "scatter", "close-range", "loud"]
     },
     {
-      "name": "Claws",
+      "name": "Hunting Rifle",
+      "type": "ranged",
+      "base_dice": 5,
+      "damage_type": "superficial",
+      "traits": ["firearm", "rifle", "loud"]
+    },
+    {
+      "name": "Sniper Rifle",
+      "type": "ranged",
+      "base_dice": 6,
+      "damage_type": "superficial",
+      "traits": ["firearm", "rifle", "precision", "loud"]
+    },
+
+    /* ---------------------- SPECIAL / SUPERNATURAL ---------------------- */
+
+    {
+      "name": "Feral Claws",
       "type": "supernatural",
-      "dice": 3,
-      "damage": "aggravated",
-      "traits": ["potence", "feral_weapons"]
+      "base_dice": 3,
+      "damage_type": "aggravated",
+      "traits": ["protean", "feral_weapons", "melee"]
+    },
+    {
+      "name": "Bone Claws",
+      "type": "supernatural",
+      "base_dice": 4,
+      "damage_type": "aggravated",
+      "traits": ["protean", "feral_weapons", "melee"]
+    },
+    {
+      "name": "Flame Attack",
+      "type": "ranged",
+      "base_dice": 3,
+      "damage_type": "aggravated",
+      "traits": ["fire", "fear_frenzy", "aggravated"]
+    },
+    {
+      "name": "Molotov Cocktail",
+      "type": "ranged",
+      "base_dice": 4,
+      "damage_type": "aggravated",
+      "traits": ["fire", "fear_frenzy", "explosive"]
+    },
+    {
+      "name": "Torch",
+      "type": "melee",
+      "base_dice": 2,
+      "damage_type": "aggravated",
+      "traits": ["fire", "fear_frenzy", "melee"]
+    },
+
+    /* ---------------------- ANTI-VAMPIRE ---------------------- */
+
+    {
+      "name": "Crossbow Bolt",
+      "type": "ranged",
+      "base_dice": 3,
+      "damage_type": "superficial",
+      "traits": ["ranged", "stake"]
+    },
+    {
+      "name": "Firearm with Incendiary Rounds",
+      "type": "ranged",
+      "base_dice": 4,
+      "damage_type": "aggravated",
+      "traits": ["firearm", "aggravated", "fire"]
+    },
+    {
+      "name": "Wooden Stake (Aimed Heart Blow)",
+      "type": "melee",
+      "base_dice": 2,
+      "damage_type": "aggravated",
+      "traits": ["stake", "melee", "paralysis"]
     }
   ]
 }
