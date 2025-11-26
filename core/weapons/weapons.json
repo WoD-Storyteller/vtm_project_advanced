@@ -1,0 +1,46 @@
+{
+  "weapons": [
+    {
+      "name": "Fists",
+      "type": "melee",
+      "dice": 1,
+      "damage": "superficial",
+      "traits": ["brawl"]
+    },
+    {
+      "name": "Switchblade",
+      "type": "melee",
+      "dice": 2,
+      "damage": "superficial",
+      "traits": ["melee", "concealable"]
+    },
+    {
+      "name": "Katana",
+      "type": "melee",
+      "dice": 3,
+      "damage": "aggravated",
+      "traits": ["melee", "lethal"]
+    },
+    {
+      "name": "Pistol",
+      "type": "ranged",
+      "dice": 3,
+      "damage": "superficial",
+      "traits": ["ranged", "firearm", "loud"]
+    },
+    {
+      "name": "Shotgun",
+      "type": "ranged",
+      "dice": 4,
+      "damage": "superficial",
+      "traits": ["ranged", "firearm", "scatter"]
+    },
+    {
+      "name": "Claws",
+      "type": "supernatural",
+      "dice": 3,
+      "damage": "aggravated",
+      "traits": ["potence", "feral_weapons"]
+    }
+  ]
+}
