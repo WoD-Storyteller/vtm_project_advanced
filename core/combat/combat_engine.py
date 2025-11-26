@@ -1,65 +1,95 @@
-import random
+from __future__ import annotations
 
-class Dice:
-    @staticmethod
-    def roll(pool):
-        rolls = [random.randint(1, 10) for _ in range(pool)]
-        successes = sum(1 for r in rolls if r >= 6)
-        tens = rolls.count(10)
-        if tens >= 2:
-            successes += (tens // 2) * 2
-        return rolls, successes
+from typing import Dict, Optional, List, Tuple
+from random import randint
 
-class Combatant:
-    def __init__(self, name, hp=10, defense=1, skills=None, attributes=None, npc=False):
-        self.name = name
-        self.hp = hp
-        self.defense = defense
-        self.npc = npc
-        self.attributes = attributes or {}
-        self.skills = skills or {}
+from core.combat.advanced_combat_engine import CombatEngine, Combatant
 
-    def dice_for_weapon(self, weapon):
-        attr = self.attributes.get("strength", 1)
-        skill = 0
 
-        if weapon["type"] == "melee":
-            skill = self.skills.get("melee", 0)
-        elif weapon["type"] == "ranged":
-            skill = self.skills.get("firearms", 0)
+class CombatSession:
+    def __init__(self, channel_id: int):
+        self.channel_id = channel_id
+        self.engine = CombatEngine()
+        self.turn_order: List[str] = []
+        self.current_index: int = 0
+        # ammo[attacker_name][weapon_name] = remaining
+        self.ammo: Dict[str, Dict[str, int]] = {}
 
-        return attr + skill + weapon["dice"]
+    def add_combatant(self, combatant: Combatant, roll_initiative: bool = True):
+        self.engine.add_combatant(combatant)
+        if roll_initiative:
+            dex = combatant.attributes.get("dexterity", 2)
+            wits = combatant.attributes.get("wits", 2)
+            initiative = randint(1, 10) + dex + wits
+            combatant.attributes["initiative"] = initiative
 
-class CombatEngine:
-    def __init__(self):
-        self.combatants = {}
-        self.log = []
-
-    def add(self, combatant):
-        self.combatants[combatant.name] = combatant
-
-    def attack(self, attacker_name, defender_name, weapon):
-        att = self.combatants[attacker_name]
-        defn = self.combatants[defender_name]
-
-        pool = att.dice_for_weapon(weapon)
-        rolls, successes = Dice.roll(pool)
-
-        hits = max(0, successes - defn.defense)
-        damage = hits if weapon["damage"] == "superficial" else hits * 2
-
-        defn.hp -= damage
-
-        entry = (
-            f"**{attacker_name}** attacks **{defender_name}** with **{weapon['name']}**\n"
-            f"Rolls: {rolls} → **{successes}** successes\n"
-            f"Defense: {defn.defense}\n"
-            f"Damage: **{damage}** ({weapon['damage']})\n"
-            f"{defender_name} HP left: **{defn.hp}**"
+    def build_initiative(self):
+        self.turn_order = sorted(
+            self.engine.combatants.keys(),
+            key=lambda n: self.engine.combatants[n].attributes.get("initiative", 0),
+            reverse=True,
         )
+        self.current_index = 0
 
-        self.log.append(entry)
-        return entry
+    def current_actor(self) -> Optional[str]:
+        if not self.turn_order:
+            return None
+        return self.turn_order[self.current_index]
 
-    def status(self):
-        return "\n".join([f"{c.name}: {c.hp} HP" for c in self.combatants.values()])
+    def next_turn(self) -> Optional[str]:
+        if not self.turn_order:
+            return None
+        self.current_index = (self.current_index + 1) % len(self.turn_order)
+        return self.turn_order[self.current_index]
+
+    # ---------- Ammo Management ----------
+
+    def use_ammo(self, attacker_name: str, weapon: dict) -> Tuple[bool, int]:
+        """
+        Decrement ammo for ranged weapons. Returns (ok, remaining).
+        If weapon is melee or has no magazine, always ok.
+        """
+        if weapon.get("type") != "ranged":
+            return True, -1
+
+        mag = int(weapon.get("magazine", 1))
+        wname = weapon.get("name", "Unknown")
+
+        user_ammo = self.ammo.setdefault(attacker_name, {})
+        current = user_ammo.get(wname, mag)
+
+        if current <= 0:
+            return False, current
+
+        current -= 1
+        user_ammo[wname] = current
+        return True, current
+
+    def reload(self, attacker_name: str, weapon: dict) -> int:
+        """
+        Reload weapon to full magazine; returns new ammo count.
+        """
+        if weapon.get("type") != "ranged":
+            return -1
+
+        mag = int(weapon.get("magazine", 1))
+        wname = weapon.get("name", "Unknown")
+        user_ammo = self.ammo.setdefault(attacker_name, {})
+        user_ammo[wname] = mag
+        return mag
+
+
+class CombatManager:
+    def __init__(self):
+        self.sessions: Dict[int, CombatSession] = {}
+
+    def start_session(self, channel_id: int) -> CombatSession:
+        session = CombatSession(channel_id)
+        self.sessions[channel_id] = session
+        return session
+
+    def get_session(self, channel_id: int) -> Optional[CombatSession]:
+        return self.sessions.get(channel_id)
+
+    def end_session(self, channel_id: int):
+        self.sessions.pop(channel_id, None)
