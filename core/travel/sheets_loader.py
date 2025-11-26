@@ -33,4 +33,36 @@ def load_sheet_zones(sheet_id: str, credentials_path: str) -> Dict[str, dict]:
         if not key:
             continue
 
-        # Create
+        # Create new zone entry
+        if key not in zones:
+            zones[key] = {
+                "key": key,
+                "name": row.get("name", ""),
+                "description": row.get("description", ""),
+                "tags": [t.strip() for t in row.get("tags", "").split(",") if t.strip()],
+                "encounter_table": row.get("encounter_table", ""),
+                "base_risk": {
+                    "violence": int(row.get("risk_violence", 1)),
+                    "masquerade": int(row.get("risk_masquerade", 1)),
+                    "si": int(row.get("risk_si", 1)),
+                },
+                "mymaps": [],
+            }
+
+        # Add My Maps entry
+        map_entry = {
+            "map_name": row.get("map_name", ""),
+            "layer": row.get("map_layer", ""),
+            "label": row.get("map_label", ""),
+            "url": row.get("map_url", ""),
+        }
+
+        if map_entry["map_name"]:
+            zones[key]["mymaps"].append(map_entry)
+
+    return zones
+
+
+def save_zones_file(zones: Dict[str, dict], path: str = ZONES_JSON_PATH):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(list(zones.values()), f, indent=4, ensure_ascii=False)
