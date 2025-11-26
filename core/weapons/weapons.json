@@ -78,66 +78,70 @@
       "traits": ["melee", "heavy", "sharp"]
     },
 
-    /* ---------------------- FIREARMS ---------------------- */
-
     {
       "name": "Light Pistol",
       "type": "ranged",
       "base_dice": 2,
       "damage_type": "superficial",
-      "traits": ["firearm", "handgun", "concealable"]
+      "traits": ["firearm", "handgun", "concealable"],
+      "magazine": 12
     },
     {
       "name": "Heavy Pistol",
       "type": "ranged",
       "base_dice": 3,
       "damage_type": "superficial",
-      "traits": ["firearm", "handgun"]
+      "traits": ["firearm", "handgun"],
+      "magazine": 10
     },
     {
       "name": "Revolver",
       "type": "ranged",
       "base_dice": 3,
       "damage_type": "superficial",
-      "traits": ["firearm", "handgun", "loud"]
+      "traits": ["firearm", "handgun", "loud"],
+      "magazine": 6
     },
     {
       "name": "SMG",
       "type": "ranged",
       "base_dice": 4,
       "damage_type": "superficial",
-      "traits": ["firearm", "automatic", "loud"]
+      "traits": ["firearm", "automatic", "loud"],
+      "magazine": 30
     },
     {
       "name": "Assault Rifle",
       "type": "ranged",
       "base_dice": 5,
       "damage_type": "superficial",
-      "traits": ["firearm", "rifle", "automatic", "loud"]
+      "traits": ["firearm", "rifle", "automatic", "loud"],
+      "magazine": 30
     },
     {
       "name": "Shotgun",
       "type": "ranged",
       "base_dice": 6,
       "damage_type": "superficial",
-      "traits": ["firearm", "scatter", "close-range", "loud"]
+      "traits": ["firearm", "scatter", "close-range", "loud"],
+      "magazine": 8
     },
     {
       "name": "Hunting Rifle",
       "type": "ranged",
       "base_dice": 5,
       "damage_type": "superficial",
-      "traits": ["firearm", "rifle", "loud"]
+      "traits": ["firearm", "rifle", "loud"],
+      "magazine": 5
     },
     {
       "name": "Sniper Rifle",
       "type": "ranged",
       "base_dice": 6,
       "damage_type": "superficial",
-      "traits": ["firearm", "rifle", "precision", "loud"]
+      "traits": ["firearm", "rifle", "precision", "loud"],
+      "magazine": 5
     },
-
-    /* ---------------------- SPECIAL / SUPERNATURAL ---------------------- */
 
     {
       "name": "Feral Claws",
@@ -175,21 +179,21 @@
       "traits": ["fire", "fear_frenzy", "melee"]
     },
 
-    /* ---------------------- ANTI-VAMPIRE ---------------------- */
-
     {
       "name": "Crossbow Bolt",
       "type": "ranged",
       "base_dice": 3,
       "damage_type": "superficial",
-      "traits": ["ranged", "stake"]
+      "traits": ["ranged", "stake"],
+      "magazine": 1
     },
     {
       "name": "Firearm with Incendiary Rounds",
       "type": "ranged",
       "base_dice": 4,
       "damage_type": "aggravated",
-      "traits": ["firearm", "aggravated", "fire"]
+      "traits": ["firearm", "aggravated", "fire"],
+      "magazine": 8
     },
     {
       "name": "Wooden Stake (Aimed Heart Blow)",
