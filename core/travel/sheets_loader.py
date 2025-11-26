@@ -7,7 +7,7 @@ import gspread
 ZONES_JSON_PATH = "data/zones.json"
 
 
-def load_sheet_zones(sheet_id="vtm_map" credentials_path="/opt/vtm_bot/bot/configs/just-sunrise-398717-bf23770e7b50.json") -> Dict[str, dict]:
+def load_sheet_zones(sheet_id="10A9sm0DMn3T5Xkglm9GoiXN3_D8DEKv_4uxL1P-lnl0/edit?usp=drivesdk" credentials_path="/opt/vtm_bot/bot/configs/just-sunrise-398717-bf23770e7b50.json") -> Dict[str, dict]:
     """
     Loads zone data from a Google Sheet and builds a zones.json structure.
 
