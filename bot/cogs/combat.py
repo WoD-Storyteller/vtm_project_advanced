@@ -62,14 +62,20 @@ class CombatCog(commands.Cog):
         if attacker_name not in engine.combatants:
             return await ctx.reply("You are not in this combat.")
 
-        weapon_key = weapon_name.lower()
-        if weapon_key not in weapons:
+        key = weapon_name.lower()
+        if key not in weapons:
             return await ctx.reply(f"Unknown weapon: `{weapon_name}`")
 
-        weapon = weapons[weapon_key]
+        weapon = weapons[key]
 
+        # Ammo check for ranged
+        ok, remaining = session.use_ammo(attacker_name, weapon)
+        if not ok:
+            return await ctx.reply(f"🔫 **Click.** You're out of ammo for **{weapon['name']}**. Use `!reload {weapon['name']}`.")
+
+        # For now, assume range='close', cover='none'. Can be expanded later.
         try:
-            result = engine.attack(attacker_name, target, weapon)
+            result = engine.attack(attacker_name, target, weapon, difficulty=2, range_band="close", cover="none")
         except ValueError as e:
             return await ctx.reply(str(e))
 
@@ -80,7 +86,7 @@ class CombatCog(commands.Cog):
             f"Normal rolls: {dice['normal_rolls']}",
             f"Hunger rolls: {dice['hunger_rolls']}",
             f"Successes: **{dice['successes']}** (`{dice['outcome']}`)",
-            f"Net successes (after defense): {result['net_successes']}",
+            f"Net successes (after defense & cover): {result['net_successes']}",
         ]
 
         if result["damage"] > 0:
@@ -91,30 +97,30 @@ class CombatCog(commands.Cog):
             )
             lines.append(
                 f"{result['defender']} HP → "
-                f"S:{dr['remaining_hp_superficial']} "
-                f"A:{dr['remaining_hp_aggravated']}"
+                f"S:{dr['remaining_hp_superficial']} A:{dr['remaining_hp_aggravated']}"
             )
         else:
             lines.append("No damage inflicted.")
 
         if dice["outcome"] == "messy_critical":
-            lines.append("💥 **Messy Critical!** The Beast takes control of the success.")
+            lines.append("💥 **Messy Critical!** The Beast rides your success.")
         elif dice["outcome"] == "bestial_failure":
             lines.append("😈 **Bestial Failure!** You lose control in a terrible way.")
 
         if result["defender_defeated"]:
             lines.append(f"☠️ **{result['defender']} is defeated!**")
 
+        # Ammo info for ranged weapons
+        if weapon.get("type") == "ranged":
+            lines.append(f"🔫 Ammo remaining in **{weapon['name']}**: {remaining}")
+
         await ctx.send("\n".join(lines))
 
-        # Frenzy notification
         if FrenzySystem.is_frenzied(attacker_name):
             await ctx.send(
-                f"😡 **{attacker_name} is in Frenzy!** They must continue to attack "
-                f"until calmed or the scene ends."
+                f"😡 **{attacker_name} is in Frenzy!** They must keep attacking until calmed or combat ends."
             )
 
-        # advance turn
         actor = session.next_turn()
         if actor:
             await ctx.send(f"➡️ Next turn: **{actor}**")
@@ -132,12 +138,28 @@ class CombatCog(commands.Cog):
         manager.end_session(ctx.channel.id)
         await ctx.send("Combat ended in this channel.")
 
+    @commands.command(name="reload")
+    async def reload(self, ctx: commands.Context, *, weapon_name: str):
+        session = manager.get_session(ctx.channel.id)
+        if not session:
+            return await ctx.reply("No active combat to reload in.")
+
+        key = weapon_name.lower()
+        if key not in weapons:
+            return await ctx.reply(f"Unknown weapon: `{weapon_name}`")
+
+        weapon = weapons[key]
+        attacker_name = ctx.author.display_name
+
+        new_count = session.reload(attacker_name, weapon)
+        if new_count < 0:
+            return await ctx.reply("You can't reload a melee weapon.")
+
+        await ctx.send(f"🔄 **{weapon['name']}** reloaded to {new_count} rounds for **{attacker_name}**.")
+
     @commands.command(name="calm")
     @commands.has_permissions(manage_guild=True)
     async def calm(self, ctx: commands.Context, *, target: str):
-        """
-        ST/Mod tool: end frenzy for a given combatant.
-        """
         if FrenzySystem.is_frenzied(target):
             FrenzySystem.clear_frenzy(target)
             await ctx.send(f"🧘 **{target} is calmed. Frenzy ends.**")
