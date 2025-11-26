@@ -2,6 +2,10 @@ import os
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
+from core.travel.zones_loader import ZoneRegistry
+
+bot.zone_registry = ZoneRegistry()
+bot.zone_registry.load()
 
 load_dotenv()
 
