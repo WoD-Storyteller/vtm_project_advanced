@@ -1,0 +1,58 @@
+# core/director/director_system/npc_generator.py
+import random
+
+NPC_LIST = [
+    "a pale stranger",
+    "a cloaked wanderer",
+    "a frightened ghoul",
+    "a Sabbat scout",
+    "a neonate lost in hunger",
+    "a mortal hunter",
+    "a Ventrue accountant clutching a broken phone",
+    "a Tremere apprentice muttering failed incantations",
+    "a Giovanni embalmer smelling faintly of formaldehyde",
+    "a Lasombra zealot whose shadow moves wrong",
+    "a Nosferatu information broker lurking in a hoodie",
+    "a Toreador painter obsessed with blood hues",
+    "a Brujah punk still vibrating with rage",
+    "a Gangrel drifter with dirt under their nails",
+    "a Malkavian whispering to someone you cannot see",
+    "a Caitiff vagrant begging for safe haven",
+    "a thin-blood alchemist holding glowing vials",
+    "a thin-blood courier rushing a mysterious package",
+    "a Ministry temptress offering forbidden pleasures",
+    "a serpent cultist wearing gold-painted sigils",
+    "a Harbinger of Skulls humming a funeral dirge",
+    "a Hecata necromancer consulting a bone charm",
+    "a Dover mortician with empty eyes",
+    "a Folkestone war pack scout wiping blood from their blade",
+    "a Sabbat fanatic reciting scripture of Caine",
+    "a Tzimisce flesh-shaper admiring their new limb",
+    "a Lasombra priest carrying a shadow-touched relic",
+    "a ghoul courier terrified they’ll miss curfew",
+    "a ghoul enforcer gripping a dented baseball bat",
+    "a mortal occultist searching for \"the truth\"",
+    "a local journalist scribbling frantic notes",
+    "a conspiracy theorist livestreaming from the bushes",
+    "a paramedic too calm for this late hour",
+    "a police officer pretending nothing supernatural exists",
+    "a wandering hedge wizard selling charms",
+    "a Cherry Moon promoter handing out glowing samples",
+    "a Pentex field agent testing air quality",
+    "a mutated test subject wrapped in medical bandages",
+    "a lab technician fleeing from something unseen",
+    "a hunter zealot clutching a blessed weapon",
+    "a teenage runaway sleeping under a neon sign",
+    "a street preacher shouting warnings about \"blood demons\"",
+    "a drunk tourist stumbling into danger",
+    "a runaway ghoul trying to detox from vitae",
+    "a occult blogger investigating local legends",
+    "a shady dealer offering questionable blood bags",
+    "a terrified civilian who saw too much",
+    "a burned-out hunter who wants to quit",
+    "a mysterious figure wrapped in storm-damp robes"
+]
+
+
+def generate_npcs(location: str, count=2):
+    return random.sample(NPC_LIST, k=min(count, len(NPC_LIST)))

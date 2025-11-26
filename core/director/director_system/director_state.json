@@ -1,0 +1,18 @@
+{
+  "awareness": 3,
+  "influence": {
+    "masquerade": 0,
+    "violence": 0,
+    "occult": 0,
+    "politics": 0,
+    "second_inquisition": 0
+  },
+  "themes": {
+    "violence": 12,
+    "occult": 7,
+    "masquerade": 3,
+    "politics": 5,
+    "mystery": 0
+  },
+  "prophecy_threads": []
+}
