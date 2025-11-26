@@ -1,25 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
-from random import randint
 from typing import Dict, List, Optional
+from random import randint
 import math
 
+from core.combat.attack_outcomes import AttackOutcome
 from core.combat.frenzy_system import FrenzySystem, FrenzyTrigger
-from core.combat.range_and_firearms import get_range_dice_modifier, get_cover_success_penalty
-
-
-class AttackOutcome(str, Enum):
-    FAIL = "fail"
-    SUCCESS = "success"
-    MESSY_CRITICAL = "messy_critical"
-    BESTIAL_FAILURE = "bestial_failure"
-
-
-class DamageType(str, Enum):
-    SUPERFICIAL = "superficial"
-    AGGRAVATED = "aggravated"
+from core.combat.bestial_chaos import roll_bestial_chaos
+from core.director.director import Director   # AI Director integration
 
 
 @dataclass
@@ -30,6 +19,7 @@ class DiceResult:
     hunger_rolls: List[int]
     successes: int
     outcome: AttackOutcome
+    bestial_chaos: Optional[str] = None
 
 
 @dataclass
@@ -46,27 +36,18 @@ class Combatant:
     fortitude: int = 0
     attributes: Dict[str, int] = field(default_factory=dict)
     skills: Dict[str, int] = field(default_factory=dict)
-    disciplines: Dict[str, int] = field(default_factory=dict)
 
     def is_defeated(self) -> bool:
         return (self.hp_superficial + self.hp_aggravated) >= self.max_hp
 
 
 class CombatEngine:
-    """
-    Advanced V5-style combat engine:
-    - Hunger dice
-    - Messy / Bestial
-    - Range & cover modifiers
-    - Disciplines (Potence/Celerity/Fortitude)
-    - Superficial vs Aggravated
-    - Frenzy integration
-    """
-
     def __init__(self):
         self.combatants: Dict[str, Combatant] = {}
 
-    # ---------- Management ----------
+    # ---------------------------------------------------------
+    #  MANAGEMENT
+    # ---------------------------------------------------------
 
     def add_combatant(self, combatant: Combatant):
         self.combatants[combatant.name] = combatant
@@ -74,7 +55,9 @@ class CombatEngine:
     def get_combatant(self, name: str) -> Optional[Combatant]:
         return self.combatants.get(name)
 
-    # ---------- Dice + Hunger ----------
+    # ---------------------------------------------------------
+    #  DICE + HUNGER MECHANICS
+    # ---------------------------------------------------------
 
     @staticmethod
     def roll_dice(pool: int, hunger: int) -> DiceResult:
@@ -83,21 +66,37 @@ class CombatEngine:
 
         normal_rolls = [randint(1, 10) for _ in range(normal)]
         hunger_rolls = [randint(1, 10) for _ in range(hunger)]
-
         all_rolls = normal_rolls + hunger_rolls
 
         successes = sum(1 for r in all_rolls if r >= 6)
+
         tens = [r for r in all_rolls if r == 10]
         crit_pairs = len(tens) // 2
         successes += crit_pairs * 2
 
+        # default outcome
         outcome = AttackOutcome.SUCCESS
+        chaos = None
 
-        if crit_pairs > 0 and any(r == 10 for r in hunger_rolls):
+        # special hunger triggers
+        has_hunger_one = any(r == 1 for r in hunger_rolls)
+        messy_crit = crit_pairs > 0 and any(r == 10 for r in hunger_rolls)
+        bestial_fail = (successes == 0) and has_hunger_one
+
+        if messy_crit:
             outcome = AttackOutcome.MESSY_CRITICAL
-        if successes == 0 and any(r == 1 for r in hunger_rolls):
+
+        elif bestial_fail:
             outcome = AttackOutcome.BESTIAL_FAILURE
-        if successes == 0 and outcome == AttackOutcome.SUCCESS:
+
+        # BESTIAL SUCCESS LOGIC
+        elif has_hunger_one and successes > 0:
+            # Not messy, not failure → BESTIAL SUCCESS
+            outcome = AttackOutcome.BESTIAL_SUCCESS
+            chaos = roll_bestial_chaos()
+
+        # simple fail without beast influence
+        elif successes == 0:
             outcome = AttackOutcome.FAIL
 
         return DiceResult(
@@ -107,23 +106,22 @@ class CombatEngine:
             hunger_rolls=hunger_rolls,
             successes=successes,
             outcome=outcome,
+            bestial_chaos=chaos
         )
 
-    # ---------- Rouse ----------
+    # ---------------------------------------------------------
+    #  ROUSE
+    # ---------------------------------------------------------
 
     @staticmethod
     def rouse_check() -> bool:
-        r = randint(1, 10)
-        return r >= 6
+        return randint(1, 10) >= 6
 
-    # ---------- Damage ----------
+    # ---------------------------------------------------------
+    #  DAMAGE SYSTEM
+    # ---------------------------------------------------------
 
-    def apply_damage(
-        self,
-        target: Combatant,
-        damage: int,
-        damage_type: DamageType,
-    ) -> Dict[str, int]:
+    def apply_damage(self, target: Combatant, damage: int, aggravated: bool):
         if damage <= 0:
             return {
                 "applied_superficial": 0,
@@ -132,150 +130,96 @@ class CombatEngine:
                 "remaining_hp_aggravated": target.hp_aggravated,
             }
 
+        # Fortitude negation
         damage = max(0, damage - target.fortitude)
 
-        applied_superficial = 0
-        applied_aggravated = 0
-
-        if target.is_vampire:
-            if damage_type == DamageType.SUPERFICIAL:
-                damage = math.ceil(damage / 2)
-                applied_superficial = min(
-                    damage,
-                    target.max_hp - target.hp_superficial - target.hp_aggravated,
-                )
-                target.hp_superficial += applied_superficial
-            else:
-                applied_aggravated = min(
-                    damage,
-                    target.max_hp - target.hp_superficial - target.hp_aggravated,
-                )
-                target.hp_aggravated += applied_aggravated
+        if aggravated:
+            applied_a = min(damage, target.max_hp - target.hp_superficial - target.hp_aggravated)
+            target.hp_aggravated += applied_a
+            applied_s = 0
         else:
-            applied_aggravated = min(
-                damage,
-                target.max_hp - target.hp_superficial - target.hp_aggravated,
-            )
-            target.hp_aggravated += applied_aggravated
+            # vampires halve superficial
+            reduced = math.ceil(damage / 2)
+            applied_s = min(reduced, target.max_hp - target.hp_superficial - target.hp_aggravated)
+            applied_a = 0
+            target.hp_superficial += applied_s
 
-        if applied_aggravated > 0 and target.is_vampire:
+        # frenzy check for aggravated
+        if applied_a > 0 and target.is_vampire:
             if FrenzySystem.check_trigger(FrenzyTrigger.AGGRAVATED_TAKEN, target):
                 FrenzySystem.apply_frenzy(target, FrenzyTrigger.AGGRAVATED_TAKEN)
 
         return {
-            "applied_superficial": applied_superficial,
-            "applied_aggravated": applied_aggravated,
+            "applied_superficial": applied_s,
+            "applied_aggravated": applied_a,
             "remaining_hp_superficial": target.hp_superficial,
             "remaining_hp_aggravated": target.hp_aggravated,
         }
 
-    # ---------- Attack ----------
+    # ---------------------------------------------------------
+    #  ATTACK RESOLUTION
+    # ---------------------------------------------------------
 
-    def attack(
-        self,
-        attacker_name: str,
-        defender_name: str,
-        weapon: dict,
-        difficulty: int = 2,
-        range_band: str = "close",
-        cover: str = "none",
-    ) -> Dict:
+    def attack(self, attacker_name: str, defender_name: str, weapon: dict):
         attacker = self.get_combatant(attacker_name)
         defender = self.get_combatant(defender_name)
 
-        if not attacker or not defender:
-            raise ValueError("Attacker or defender not found in combat.")
+        attrs = attacker.attributes
+        skills = attacker.skills
 
-        attrs = attacker.attributes or {}
-        skills = attacker.skills or {}
-        discs = attacker.disciplines or {}
-
-        w_type = weapon.get("type")
-        traits = weapon.get("traits", [])
-
-        # Attribute/skill base
-        if w_type == "ranged":
-            attr_val = attrs.get("dexterity", 2)
-            skill_val = skills.get("firearms", 0)
+        if weapon.get("type") == "ranged":
+            pool = attrs.get("dexterity", 2) + skills.get("firearms", 0)
         else:
-            attr_val = attrs.get("strength", 2)
-            skill_val = skills.get("melee", 0) or skills.get("brawl", 0)
+            pool = attrs.get("strength", 2) + max(skills.get("melee", 0), skills.get("brawl", 0))
 
-        base_dice = weapon.get("base_dice", 0)
-        pool = attr_val + skill_val + base_dice
+        pool += weapon.get("base_dice", 0)
 
-        # Range modifiers
-        pool += get_range_dice_modifier(weapon, range_band)
+        dice = self.roll_dice(pool, attacker.hunger)
 
-        # Disciplines:
-        potence = int(discs.get("potence", 0))
-        celerity = int(discs.get("celerity", 0))
+        # NET SUCCESSES
+        net = dice.successes - defender.defense
+        damage = max(0, net - 1)  # diff 2 baseline
 
-        if w_type in ("melee", "supernatural") and potence > 0:
-            pool += potence
-        if w_type == "ranged" and celerity > 0:
-            pool += celerity
-
-        pool = max(1, pool)
-
-        dice_result = self.roll_dice(pool, attacker.hunger)
-
-        # Frenzy triggers from dice outcome
-        if dice_result.outcome == AttackOutcome.BESTIAL_FAILURE:
-            if FrenzySystem.check_trigger(FrenzyTrigger.BESTIAL_FAILURE, attacker):
-                FrenzySystem.apply_frenzy(attacker, FrenzyTrigger.BESTIAL_FAILURE)
-        elif dice_result.outcome == AttackOutcome.MESSY_CRITICAL:
-            if FrenzySystem.check_trigger(FrenzyTrigger.MESSY_CRITICAL, attacker):
-                FrenzySystem.apply_frenzy(attacker, FrenzyTrigger.MESSY_CRITICAL)
-
-        net_successes = dice_result.successes - defender.defense
-
-        # Cover applies as success penalty
-        cover_penalty = get_cover_success_penalty(cover)
-        net_successes -= cover_penalty
-
-        success_margin = net_successes - difficulty + 1
-        damage = max(0, success_margin)
-
-        dmg_type = DamageType(weapon.get("damage_type", "superficial"))
-
-        # Extra bite while frenzied
-        if FrenzySystem.is_frenzied(attacker.name):
+        # BESTIAL SUCCESS EXTRA DAMAGE
+        if dice.outcome == AttackOutcome.BESTIAL_SUCCESS:
             damage += 1
 
-        damage_report: Dict[str, int] = {}
-        if damage > 0:
-            damage_report = self.apply_damage(defender, damage, dmg_type)
+        aggravated = weapon.get("damage_type") == "aggravated"
+
+        dmg_report = self.apply_damage(defender, damage, aggravated)
+
+        # DIRECTOR HOOKS
+        if dice.outcome in [AttackOutcome.BESTIAL_SUCCESS, AttackOutcome.MESSY_CRITICAL]:
+            Director.modify_influence("violence", +1)
+
+        if dice.outcome == AttackOutcome.BESTIAL_FAILURE:
+            Director.modify_influence("masquerade", +1)
+
+        if dice.outcome == AttackOutcome.MESSY_CRITICAL:
+            Director.modify_influence("violence", +2)
+
+        if dice.outcome == AttackOutcome.BESTIAL_SUCCESS:
+            Director.modify_influence("masquerade", +1)
 
         return {
-            "attacker": attacker.name,
-            "defender": defender.name,
-            "weapon": weapon.get("name", "Unknown"),
-            "dice": {
-                "pool": dice_result.pool,
-                "hunger": dice_result.hunger,
-                "normal_rolls": dice_result.normal_rolls,
-                "hunger_rolls": dice_result.hunger_rolls,
-                "successes": dice_result.successes,
-                "outcome": dice_result.outcome.value,
-            },
-            "net_successes": net_successes,
+            "attacker": attacker_name,
+            "defender": defender_name,
+            "weapon": weapon,
+            "dice": dice,
+            "net_successes": net,
             "damage": damage,
-            "damage_type": dmg_type.value,
-            "damage_report": damage_report,
-            "defender_defeated": defender.is_defeated(),
+            "damage_report": dmg_report,
+            "defeated": defender.is_defeated()
         }
 
-    # ---------- Status ----------
+    # ---------------------------------------------------------
+    #  STATUS
+    # ---------------------------------------------------------
 
-    def status(self) -> List[str]:
-        lines: List[str] = []
+    def status(self):
+        lines = []
         for c in self.combatants.values():
-            total = c.hp_superficial + c.hp_aggravated
             lines.append(
-                f"{c.name}: {total}/{c.max_hp} "
-                f"(S:{c.hp_superficial} A:{c.hp_aggravated}) "
-                f"Hunger:{c.hunger} "
-                f"WP(S/A):{c.willpower_superficial}/{c.willpower_aggravated}"
+                f"{c.name} HP {c.hp_superficial}/{c.hp_aggravated}/{c.max_hp} – Hunger {c.hunger}"
             )
         return lines
