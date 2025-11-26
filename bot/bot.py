@@ -19,7 +19,7 @@ class VTM(commands.Bot):
         await self.load_extension("cogs.scene")
         await self.load_extension("cogs.combat")
         await self.load_extension("cogs.storyteller")
-
+        await self.load_extension("cogs.disciplines")
     async def on_ready(self):
         print(f"Bot online as {self.user}")
 
