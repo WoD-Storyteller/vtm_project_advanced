@@ -1,0 +1,68 @@
+# ------------ PYTHON ------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.pkl
+
+# ------------ ENVIRONMENTS ------------
+venv/
+env/
+.venv/
+.env
+
+# ------------ EDITORS ------------
+.vscode/
+.idea/
+*.swp
+
+# ------------ LOGS & OUTPUT ------------
+logs/
+*.log
+*.out
+*.err
+nohup.out
+
+# ------------ BUILD ARTIFACTS ------------
+build/
+dist/
+*.egg-info/
+
+# ------------ CACHE DIRS ------------
+.cache/
+*.pycache/
+
+# ------------ COMPILER / PLATFORM ------------
+*.so
+.DS_Store
+Thumbs.db
+
+# ------------ CONFIG & SECRETS ------------
+# Google API Keys
+configs/service_account.json
+
+# Local settings
+configs/*.local.json
+configs/*.secret.json
+configs/*.private.json
+
+# Environment configs
+*.env
+.env.*
+.envrc
+secrets.json
+
+# ------------ DATA (OPTIONAL) ------------
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+data/*.bak
+
+# If you want to ignore auto-generated travel zone JSON:
+data/zones.json
+
+# ------------ BOT RUNTIME ------------
+# Temporary data the bot generates
+sessions/
+cache/
