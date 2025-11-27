@@ -9,185 +9,203 @@ from core.travel.zones_loader import ZoneRegistry
 from core.travel.travel_engine import TravelEngine
 from core.travel.sheets_loader import load_sheet_zones, save_zones_file
 from core.time.time_state import get_time_state, advance_time, format_time
-from director_system.hooks import apply_travel_event
+from core.director.ai_director import _V5_DIRECTOR, _DIRECTOR_STATE
 
 load_dotenv()
 
 
 class TravelCog(commands.Cog):
     """
-    Global travel + time system.
+    Global travel + zone system.
 
-    Commands:
-      !zones              - list known zones
-      !whereami           - show current zone + map links
-      !travel <dest>      - travel to another zone (advancing time)
-      !time               - show chronicle time (night/hour)
-      !zones_sync         - (admin) sync zones from Google Sheets
+    - !whereami                – show your current zone & maps
+    - !travel <zone>           – move to another zone (updates time & Director)
+    - !sync_zones              – admin: sync zones from Google Sheets
     """
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        # ZoneRegistry is attached to bot in main.py:
-        #   bot.zone_registry = ZoneRegistry(); bot.zone_registry.load()
-        self.registry: ZoneRegistry = bot.zone_registry
+        self.registry: ZoneRegistry = getattr(bot, "zone_registry", ZoneRegistry())
+        self.registry.load()
         self.engine = TravelEngine(self.registry)
+        # Also make available on bot for other cogs
+        self.bot.zone_registry = self.registry
 
-    # --------------------------------------------------
-    # HELPERS
-    # --------------------------------------------------
-
-    def _get_player(self, ctx):
-        guild_data = get_guild_data(self.bot.data_store, ctx.guild.id)
-        player = guild_data.get("players", {}).get(str(ctx.author.id))
-        return guild_data, player
-
-    # --------------------------------------------------
-    # COMMANDS
-    # --------------------------------------------------
-
-    @commands.command(name="zones")
-    async def zones(self, ctx: commands.Context):
-        """
-        List major zones (world-wide) loaded from zones.json.
-        """
-        zs = self.registry.list()
-        if not zs:
-            return await ctx.reply("No zones loaded. Ask your Storyteller to run `!zones_sync`.")
-
-        lines = []
-        for z in zs:
-            tag_str = ", ".join(z.tags) if z.tags else "no tags"
-            lines.append(f"`{z.key}` – **{z.name}** ({tag_str})")
-
-        desc = "\n".join(lines[:100])  # hard cap for sanity
-        embed = discord.Embed(
-            title="Known Zones",
-            description=desc,
-            color=discord.Color.dark_gold(),
+    # -------------------------------------------------
+    # Helpers
+    # -------------------------------------------------
+    def _format_zone(self, zone) -> str:
+        lines = [f"**{zone.name}** (`{zone.key}`)"]
+        if zone.region or zone.country:
+            lines.append(f"{zone.region}, {zone.country}".strip(", "))
+        if zone.faction:
+            lines.append(f"Faction: {zone.faction}")
+        lines.append(f"Danger: {zone.danger}/5")
+        risk = zone.base_risk
+        lines.append(
+            "Risk – "
+            f"Violence: {risk.get('violence', 1)}, "
+            f"Masquerade: {risk.get('masquerade', 1)}, "
+            f"SI: {risk.get('si', 1)}, "
+            f"Occult: {risk.get('occult', 1)}"
         )
-        await ctx.send(embed=embed)
+        if zone.tags:
+            lines.append(f"Tags: {', '.join(zone.tags)}")
+        return "\n".join(lines)
 
+    def _apply_travel_to_director(
+        self,
+        zone,
+        time_info,
+    ):
+        """
+        Rough integration of travel + time into V5 Director state.
+        """
+        risk = zone.base_risk
+
+        _DIRECTOR_STATE.adjust("masquerade_pressure", risk.get("masquerade", 1))
+        _DIRECTOR_STATE.adjust("violence_pressure", risk.get("violence", 1))
+        _DIRECTOR_STATE.adjust("occult_pressure", risk.get("occult", 1))
+        _DIRECTOR_STATE.adjust("si_pressure", risk.get("si", 1))
+
+        if time_info.get("crossed_sunrise"):
+            _DIRECTOR_STATE.adjust("masquerade_pressure", 2)
+            _DIRECTOR_STATE.adjust("si_pressure", 2)
+            _DIRECTOR_STATE.adjust("awareness", 2)
+        elif time_info.get("near_sunrise"):
+            _DIRECTOR_STATE.adjust_theme("masquerade", +1)
+            _DIRECTOR_STATE.adjust("awareness", 1)
+
+        _DIRECTOR_STATE.save()
+        return _DIRECTOR_STATE.summarize()
+
+    # -------------------------------------------------
+    # Commands
+    # -------------------------------------------------
     @commands.command(name="whereami")
-    async def whereami(self, ctx: commands.Context):
+    async def where_am_i(self, ctx: commands.Context):
         """
-        Show your character's current location and related map links.
+        Show current zone & maps.
         """
-        guild_data, player = self._get_player(ctx)
-        if not player:
-            return await ctx.reply("You don't have a character sheet yet.")
+        guild_data = get_guild_data(self.bot.data_store, ctx.guild.id)
+        players = guild_data.get("players") or {}
+        player = players.get(str(ctx.author.id))
 
-        loc_key = player.get("location_key") or self.registry.default_zone_key()
-        zone = self.registry.get(loc_key) or self.registry.get(self.registry.default_zone_key())
+        if not player:
+            return await ctx.reply("You do not have a character sheet.")
+
+        key = player.get("location_key") or self.registry.default_zone_key()
+        zone = self.registry.get(key) or self.registry.find(key)
+
+        if not zone:
+            return await ctx.reply("You are in an unknown void. Tell the ST to fix your location_key.")
 
         embed = discord.Embed(
-            title=f"{player.get('name', ctx.author.display_name)} – Current Location",
-            description=f"**{zone.name}**\n\n{zone.description}",
-            color=discord.Color.blurple(),
+            title="Current Zone",
+            description=self._format_zone(zone),
+            color=discord.Color.purple(),
         )
-        embed.add_field(name="Region", value=zone.region or "Unknown", inline=True)
-        embed.add_field(name="Faction", value=zone.faction or "Unknown", inline=True)
 
         if zone.mymaps:
-            for entry in zone.mymaps[:5]:
-                embed.add_field(
-                    name=f"📍 {entry.get('map_name')}",
-                    value=(
-                        f"Layer: `{entry.get('layer')}`\n"
-                        f"Label: `{entry.get('label')}`\n"
-                        f"[Open Map]({entry.get('url')})"
-                    ),
-                    inline=False,
-                )
+            value_lines = []
+            for m in zone.mymaps:
+                label = m.get("map_name") or "Map"
+                url = m.get("url") or ""
+                mtype = m.get("type", "mymaps")
+                value_lines.append(f"[{label}]({url}) ({mtype})")
+            embed.add_field(name="Maps", value="\n".join(value_lines), inline=False)
 
         await ctx.send(embed=embed)
-
-    @commands.command(name="time")
-    async def show_time(self, ctx: commands.Context):
-        """
-        Show the current in-game time (night/hour).
-        """
-        guild_data, _ = self._get_player(ctx)
-        ts = get_time_state(guild_data)
-        text = format_time(ts)
-        self.bot.save_data()
-        await ctx.reply(f"🕒 In-game time: **{text}**")
 
     @commands.command(name="travel")
     async def travel(self, ctx: commands.Context, *, destination: str):
         """
-        Travel your character to another zone (by key or name fragment).
-        Advances in-game time based on zone travel_difficulty.
+        Travel to another zone by key or name (fuzzy).
         """
-        guild_data, player = self._get_player(ctx)
+        guild_data = get_guild_data(self.bot.data_store, ctx.guild.id)
+        players = guild_data.get("players") or {}
+        player = players.get(str(ctx.author.id))
+
         if not player:
-            return await ctx.reply("You don't have a character sheet yet.")
+            return await ctx.reply("You do not have a character sheet.")
 
-        # Run travel engine
-        result = self.engine.travel(player, destination)
-        if not result["success"]:
-            return await ctx.reply(result["msg"])
+        async with ctx.typing():
+            result = self.engine.travel(player, destination)
 
-        dest = result["zone"]
-        origin = result["origin"]
-        encounter = result["encounter"]
-        time_cost = result["time_cost"]
+            if not result["success"]:
+                return await ctx.reply(result["msg"])
 
-        # Advance time for the guild
-        time_info = advance_time(guild_data, time_cost)
-        ts = time_info["time_state"]
-        time_str = format_time(ts)
+            zone = result["zone"]
+            origin = result["origin"]
+            time_cost = result["time_cost"]
 
-        # Director hook
-        apply_travel_event(guild_data, dest, encounter, time_info)
+            # Time progression
+            ts = get_time_state(guild_data)
+            time_info = advance_time(guild_data, time_cost)
+            time_str = format_time(time_info["time_state"])
 
-        # Persist data
-        self.bot.save_data()
-
-        # Build response
-        desc_lines = [
-            f"{result['msg']}",
-            f"Travel time: **{time_cost}h**",
-            f"Current in-game time: **{time_str}**",
-        ]
-
-        if time_info.get("near_sunrise") and not time_info.get("crossed_sunrise"):
-            desc_lines.append("⚠ The horizon is paling. Sunrise is getting close.")
-        if time_info.get("crossed_sunrise"):
-            desc_lines.append("☀ You have pushed past sunrise. This is extremely dangerous.")
-
-        if encounter:
-            desc_lines.append("")
-            desc_lines.append(f"**Encounter:** {encounter['text']} (Severity {encounter['severity']})")
+            director_summary = self._apply_travel_to_director(zone, time_info)
 
         embed = discord.Embed(
-            title=f"Travel – {player.get('name', ctx.author.display_name)}",
-            description="\n".join(desc_lines),
-            color=discord.Color.dark_teal(),
+            title="Travel",
+            description=result["msg"],
+            color=discord.Color.dark_gold(),
         )
+
+        embed.add_field(
+            name="Time Cost",
+            value=f"{time_cost} hours\nNew time: {time_str}",
+            inline=False,
+        )
+
+        embed.add_field(
+            name="Destination",
+            value=self._format_zone(zone),
+            inline=False,
+        )
+
+        city_state = director_summary
+        embed.add_field(
+            name="City Pressure (Director)",
+            value=(
+                f"Masquerade: {city_state.get('masquerade_pressure', 0)}\n"
+                f"Violence: {city_state.get('violence_pressure', 0)}\n"
+                f"Occult: {city_state.get('occult_pressure', 0)}\n"
+                f"SI: {city_state.get('si_pressure', 0)}\n"
+                f"Politics: {city_state.get('political_pressure', 0)}\n"
+                f"Global Threat: {city_state.get('global_threat', 1)}"
+            ),
+            inline=False,
+        )
+
+        if result["encounter"]:
+            enc = result["encounter"]
+            embed.add_field(
+                name="Travel Encounter",
+                value=f"{enc.get('text', 'Something happens on the road...')}\n"
+                      f"Severity: {enc.get('severity', 1)}",
+                inline=False,
+            )
 
         await ctx.send(embed=embed)
 
-    @commands.command(name="zones_sync")
+    @commands.command(name="sync_zones")
     @commands.has_permissions(administrator=True)
-    async def zones_sync(self, ctx: commands.Context):
+    async def sync_zones(self, ctx: commands.Context):
         """
-        Sync zones from Google Sheets → zones.json → reload registry.
-        Uses GOOGLE_SHEET_ID and GOOGLE_SERVICE_ACCOUNT from .env
+        Sync zones from Google Sheets and reload registry.
         """
-        await ctx.send("🔄 Syncing zones from Google Sheets…")
+        async with ctx.typing():
+            try:
+                zones = load_sheet_zones()  # uses .env defaults
+                save_zones_file(zones)
 
-        try:
-            zones = load_sheet_zones()  # uses .env defaults
-            save_zones_file(zones)
+                self.registry.load()
+                self.bot.zone_registry = self.registry
 
-            # Reload registry
-            self.registry.load()
-            self.bot.zone_registry = self.registry
-
-            await ctx.send("✅ **Zones synced & reloaded successfully!**")
-        except Exception as e:
-            await ctx.send(f"❌ **Zone sync failed:** `{e}`")
+                await ctx.send("✅ **Zones synced & reloaded successfully!**")
+            except Exception as e:
+                await ctx.send(f"❌ **Zone sync failed:** `{e}`")
 
 
 async def setup(bot: commands.Bot):
