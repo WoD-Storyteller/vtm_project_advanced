@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Any
 
-from core.vtmv5 import dice, hunger, character_model
+from . import dice, hunger, character_model
 from core.travel.zones_loader import Zone
 
 
@@ -28,9 +28,10 @@ class HuntingEngine:
         dice_pool = 4 + int(getattr(zone, "hunting_risk", 0))
         bonus_notes = []
 
-        # Violence risk tag
-        violence_risk = zone.base_risk.get("violence", 0) if getattr(zone, "base_risk", None) else 0
-        tags = zone.tags or []
+        # zone data
+        base_risk = getattr(zone, "base_risk", {}) or {}
+        violence_risk = base_risk.get("violence", 0)
+        tags = getattr(zone, "tags", []) or []
 
         # --- Alleycat: better in violent zones ---
         if pred_key == "alleycat":
@@ -86,7 +87,7 @@ class HuntingEngine:
                 dice_pool += 2
                 bonus_notes.append("Blood Leech: +2 dice where other Kindred are active.")
 
-        # Floor at 1 die so you always roll something
+        # Floor at 1 die
         dice_pool = max(1, dice_pool)
 
         return {
@@ -102,7 +103,7 @@ class HuntingEngine:
         Decide whether this hunt is effectively human/animal/bagged/vampire feeding.
         """
         pred_key = character_model.get_predator_key(player)
-        tags = zone.tags or []
+        tags = getattr(zone, "tags", []) or []
 
         source = "human"  # default
 
