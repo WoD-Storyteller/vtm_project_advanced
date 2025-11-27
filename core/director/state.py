@@ -27,7 +27,7 @@ DEFAULT_STATE: Dict[str, Any] = {
 
 class DirectorState:
     """
-    Thin manager around director_state.json.
+    Thin manager around a city-scale director_state JSON blob.
     """
 
     def __init__(self, path: str):
@@ -48,10 +48,11 @@ class DirectorState:
         else:
             self.data = DEFAULT_STATE.copy()
 
-        # Make sure required keys exist
+        # Ensure required keys
         for k, v in DEFAULT_STATE.items():
             if k not in self.data:
-                self.data[k] = v
+                # dicts should be shallow copies
+                self.data[k] = v.copy() if isinstance(v, dict) else v
 
         if "themes" not in self.data:
             self.data["themes"] = DEFAULT_STATE["themes"].copy()
@@ -59,7 +60,7 @@ class DirectorState:
     def save(self):
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
         with open(self.path, "w", encoding="utf-8") as f:
-            json.dump(self.data, f, indent=2)
+            json.dump(self.data, f, indent=2, ensure_ascii=False)
 
     # -------------------------------------------------
     # Simple helpers
@@ -93,7 +94,6 @@ class DirectorState:
             + self.data.get("si_pressure", 0)
             + self.data.get("political_pressure", 0)
         )
-        # 0–10 -> 1, 11–20 -> 2, etc.
         if total <= 10:
             return 1
         elif total <= 20:
