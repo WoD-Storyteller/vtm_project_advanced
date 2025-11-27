@@ -8,16 +8,22 @@ from core.travel.zones_loader import ZoneRegistry
 
 
 class HuntingCommands(commands.Cog):
+    """
+    Hunting commands:
+      !hunt_victim <location>  – narrative victim generator
+      !hunt                    – V5 Predator-aware hunting + feeding
+    """
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.engine = HuntingEngine()
 
     async def cog_check(self, ctx):
-        # You can later lock this to certain channels/roles
+        # later you can restrict by channel/role if you want
         return True
 
     # ----------------------------------------------------
-    # !hunt_victim – keep your original flavour tool
+    # !hunt_victim – keep your existing flavour helper
     # ----------------------------------------------------
     @commands.command(name="hunt_victim")
     async def hunt_victim(self, ctx, *, location: str):
@@ -25,8 +31,8 @@ class HuntingCommands(commands.Cog):
         Generates a random mortal victim for narrative hunting scenes.
         Uses your existing generate_hunt_victim AI helper.
         """
-        g_data = get_guild_data(self.bot.data_store, ctx.guild.id)
-        player_data = g_data.get("players", {}).get(str(ctx.author.id))
+        guild_data = get_guild_data(self.bot.data_store, ctx.guild.id)
+        player_data = guild_data.get("players", {}).get(str(ctx.author.id))
 
         async with ctx.typing():
             victim_data = await generate_hunt_victim(
@@ -38,13 +44,13 @@ class HuntingCommands(commands.Cog):
         if not victim_data:
             return await ctx.reply("I couldn't generate a victim right now.")
 
-        # Try to be flexible about victim_data structure
+        # Try to interpret victim_data flexibly
         if isinstance(victim_data, str):
-            desc = victim_data
             name = "Unfortunate Mortal"
+            desc = victim_data
         elif isinstance(victim_data, dict):
             name = victim_data.get("name", "Unfortunate Mortal")
-            desc = victim_data.get("description", "") or victim_data.get("blurb", "")
+            desc = victim_data.get("description") or victim_data.get("blurb") or ""
         else:
             name = "Unfortunate Mortal"
             desc = str(victim_data)
@@ -62,12 +68,11 @@ class HuntingCommands(commands.Cog):
     @commands.command(name="hunt")
     async def hunt(self, ctx):
         """
-        Perform a Predator-type–aware V5 hunting roll
-        in your current zone, applying hunger changes
-        via the V5 feeding engine.
+        Perform a Predator-type–aware V5 hunting roll in your current zone.
+        Applies hunger changes via the V5 feeding engine.
         """
-        g_data = get_guild_data(self.bot.data_store, ctx.guild.id)
-        player = g_data.get("players", {}).get(str(ctx.author.id))
+        guild_data = get_guild_data(self.bot.data_store, ctx.guild.id)
+        player = guild_data.get("players", {}).get(str(ctx.author.id))
 
         if not player:
             return await ctx.reply("You don't have a character sheet yet.")
