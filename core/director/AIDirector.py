@@ -1,65 +1,173 @@
-# core/director/AIDirector.py
+from __future__ import annotations
 
-from pathlib import Path
-import json
+import os
+from typing import Dict, Any, List, Optional
 
-from core.utils import load_json, save_json
-from core.director.director_system.prophecy import resolve_prophecy
-from core.director.director_system.npc_generator import generate_npcs
+from utils import (
+    generate_storyteller_response,
+    generate_random_encounter,
+    score_encounter_severity,
+    apply_director_reaction_from_encounter,
+    populate_location_npcs,
+)
+
+from core.vtmv5 import character_model
+from core.director.state import DirectorState
+from core.director.director import V5DirectorAdapter
+
+
+# Path to director_state.json (same folder as this file)
+DIRECTOR_STATE_PATH = os.path.join(os.path.dirname(__file__), "director_state.json")
+
+# Single shared DirectorState + V5-aware adapter
+_DIRECTOR_STATE = DirectorState(DIRECTOR_STATE_PATH)
+_V5_DIRECTOR = V5DirectorAdapter(_DIRECTOR_STATE)
 
 
 class AIDirector:
     """
-    Central AI storytelling engine.
-    Tracks awareness, themes, prophecy threads, encounters, etc.
+    High-level AI Director orchestrator.
+
+    This class:
+      - Pulls V5 context (Humanity, Stains, Hunger, Predator Type, Merits/Flaws, Touchstones)
+      - Reads global director_state.json via DirectorState
+      - Calls your AI helpers (generate_storyteller_response, generate_random_encounter, etc.)
+      - Returns a unified scene payload:
+
+        {
+          "intro_text": str,
+          "npcs": [...],
+          "encounter": {...} or None,
+          "quest_hook": str or "",
+          "severity": int or None,        # 1–5
+          "severity_label": str or None,  # "low", "guarded", "tense", "critical", "apocalyptic"
+          "director_update": {...},       # updated director state snapshot
+        }
     """
 
-    def __init__(self):
-        self.state_file = "director_state.json"
-        self.state = load_json(self.state_file, default=self._default_state())
+    @staticmethod
+    def _severity_label(level: int) -> str:
+        if level <= 1:
+            return "low"
+        elif level == 2:
+            return "guarded"
+        elif level == 3:
+            return "tense"
+        elif level == 4:
+            return "critical"
+        else:
+            return "apocalyptic"
 
-    def _default_state(self):
-        return {
-            "awareness": 0,
-            "influence": {
-                "masquerade": 0,
-                "violence": 0,
-                "occult": 0,
-                "politics": 0,
-                "second_inquisition": 0
-            },
-            "themes": {
-                "violence": 5,
-                "occult": 5,
-                "masquerade": 5,
-                "politics": 5,
-                "mystery": 5
-            },
-            "prophecy_threads": []
-        }
+    @staticmethod
+    def _build_director_context(
+        guild_data: Dict[str, Any],
+        travelers: List[Any],
+    ) -> Dict[str, Any]:
+        """
+        Build a V5-aware director context based on the first traveling character.
 
-    def save(self):
-        save_json(self.state_file, self.state)
+        `travelers` is expected to be either:
+          - list of player dicts, or
+          - list of player IDs that can be resolved from guild_data['players']
 
-    # --------------------
-    # SCENE GENERATION
-    # --------------------
+        We keep it defensive and just do our best with what's available.
+        """
+        if not travelers:
+            # no specific PC focus; return global city state only
+            return _V5_DIRECTOR.global_scene_directives()
 
-    def generate_scene(self, location: str, travelers=None, risk: int = 2):
-        travelers = travelers or []
+        players_map = (guild_data.get("players") or {}) if isinstance(guild_data, dict) else {}
+        primary = travelers[0]
 
-        npcs = generate_npcs(location, count=2)
-        prophecy = resolve_prophecy(self.state)
+        # If it's an ID, try to resolve
+        if not isinstance(primary, dict):
+            primary = players_map.get(str(primary), {})
 
-        scene_text = (
-            f"You arrive at **{location}**.\n"
-            f"Two figures are nearby: {', '.join(npcs)}.\n"
-            f"Prophecy whispers: {prophecy}\n"
-        )
+        character_model.ensure_character_state(primary)
+        return _V5_DIRECTOR.scene_directives_for_player(primary)
 
-        return {
-            "intro_text": scene_text,
-            "npcs": npcs,
-            "prophecy": prophecy,
-            "severity": risk
-        }
+    @staticmethod
+    async def generate_scene(
+        model_text,
+        model_json,
+        guild_data: Dict[str, Any],
+        guild_id: int,
+        location_key: str,
+        travelers: List[Any],
+        risk: int = 2,
+        tags: Optional[List[str]] = None,
+        director_state: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Unified scene-generation engine.
+
+        Args:
+          model_text:   LLM for narrative text
+          model_json:   LLM for structured JSON
+          guild_data:   full guild data store
+          guild_id:     Discord guild id
+          location_key: current location/zone key
+          travelers:    list of PCs (dicts or ids)
+          risk:         base risk (1–5) from travel or ST
+          tags:         semantic tags for scene (["combat", "elysium", ...])
+          director_state: (optional) legacy director state dict (ignored now, kept for compatibility)
+
+        Returns:
+          {
+            "intro_text": str,
+            "npcs": [...],
+            "encounter": {...} or None,
+            "quest_hook": str or "",
+            "severity": int or None,
+            "severity_label": str or None,
+            "director_update": {...} or None,
+          }
+        """
+        tags = tags or []
+
+        # 1) Build V5-aware context for the scene
+        director_context = AIDirector._build_director_context(guild_data, travelers)
+        city_state = director_context.get("city_state", {})
+        personal = director_context.get("personal", {})
+
+        global_threat = city_state.get("global_threat", 1)
+        personal_threat = personal.get("personal_threat", 1)
+
+        # Basic severity heuristic
+        severity = max(global_threat, personal_threat, int(risk or 1))
+        severity_label = AIDirector._severity_label(severity)
+
+        # 2) NPCs for this location
+        try:
+            npcs = await populate_location_npcs(
+                model_json,
+                location_key,
+                guild_data,
+            )
+        except TypeError:
+            # fallback if your populate_location_npcs has fewer parameters
+            npcs = await populate_location_npcs(model_json, location_key)
+        except Exception:
+            npcs = []
+
+        if npcs is None:
+            npcs = []
+
+        # 3) Optional encounter
+        encounter = None
+        encounter_severity = None
+        encounter_reaction = None
+
+        try:
+            # Most flexible attempt: pass as much context as possible
+            encounter = await generate_random_encounter(
+                model_json=model_json,
+                guild_data=guild_data,
+                guild_id=guild_id,
+                location_key=location_key,
+                travelers=travelers,
+                director_context=director_context,
+                tags=tags,
+            )
+        except TypeError:
+            # Simpler fallback signatures if your util is older
