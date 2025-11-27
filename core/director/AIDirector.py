@@ -16,10 +16,10 @@ from core.director.state import DirectorState
 from core.director.director import V5DirectorAdapter
 
 
-# Path to director_state.json (same folder as this file)
+# Path to V5-aware director_state.json (separate from legacy director_system)
 DIRECTOR_STATE_PATH = os.path.join(os.path.dirname(__file__), "director_state.json")
 
-# Single shared DirectorState + V5-aware adapter
+# Shared DirectorState + V5 adapter, importable by other modules (hunting, travel, etc.)
 _DIRECTOR_STATE = DirectorState(DIRECTOR_STATE_PATH)
 _V5_DIRECTOR = V5DirectorAdapter(_DIRECTOR_STATE)
 
@@ -65,21 +65,13 @@ class AIDirector:
     ) -> Dict[str, Any]:
         """
         Build a V5-aware director context based on the first traveling character.
-
-        `travelers` is expected to be either:
-          - list of player dicts, or
-          - list of player IDs that can be resolved from guild_data['players']
-
-        We keep it defensive and just do our best with what's available.
         """
         if not travelers:
-            # no specific PC focus; return global city state only
             return _V5_DIRECTOR.global_scene_directives()
 
         players_map = (guild_data.get("players") or {}) if isinstance(guild_data, dict) else {}
         primary = travelers[0]
 
-        # If it's an ID, try to resolve
         if not isinstance(primary, dict):
             primary = players_map.get(str(primary), {})
 
@@ -100,32 +92,9 @@ class AIDirector:
     ) -> Dict[str, Any]:
         """
         Unified scene-generation engine.
-
-        Args:
-          model_text:   LLM for narrative text
-          model_json:   LLM for structured JSON
-          guild_data:   full guild data store
-          guild_id:     Discord guild id
-          location_key: current location/zone key
-          travelers:    list of PCs (dicts or ids)
-          risk:         base risk (1–5) from travel or ST
-          tags:         semantic tags for scene (["combat", "elysium", ...])
-          director_state: (optional) legacy director state dict (ignored now, kept for compatibility)
-
-        Returns:
-          {
-            "intro_text": str,
-            "npcs": [...],
-            "encounter": {...} or None,
-            "quest_hook": str or "",
-            "severity": int or None,
-            "severity_label": str or None,
-            "director_update": {...} or None,
-          }
         """
         tags = tags or []
 
-        # 1) Build V5-aware context for the scene
         director_context = AIDirector._build_director_context(guild_data, travelers)
         city_state = director_context.get("city_state", {})
         personal = director_context.get("personal", {})
@@ -133,11 +102,10 @@ class AIDirector:
         global_threat = city_state.get("global_threat", 1)
         personal_threat = personal.get("personal_threat", 1)
 
-        # Basic severity heuristic
         severity = max(global_threat, personal_threat, int(risk or 1))
         severity_label = AIDirector._severity_label(severity)
 
-        # 2) NPCs for this location
+        # 2) NPCs
         try:
             npcs = await populate_location_npcs(
                 model_json,
@@ -145,21 +113,22 @@ class AIDirector:
                 guild_data,
             )
         except TypeError:
-            # fallback if your populate_location_npcs has fewer parameters
-            npcs = await populate_location_npcs(model_json, location_key)
+            try:
+                npcs = await populate_location_npcs(model_json, location_key)
+            except Exception:
+                npcs = []
         except Exception:
             npcs = []
 
         if npcs is None:
             npcs = []
 
-        # 3) Optional encounter
+        # 3) Encounter
         encounter = None
         encounter_severity = None
         encounter_reaction = None
 
         try:
-            # Most flexible attempt: pass as much context as possible
             encounter = await generate_random_encounter(
                 model_json=model_json,
                 guild_data=guild_data,
@@ -170,7 +139,6 @@ class AIDirector:
                 tags=tags,
             )
         except TypeError:
-            # Simpler fallback signatures if your util is older
             try:
                 encounter = await generate_random_encounter(
                     model_json,
@@ -183,7 +151,6 @@ class AIDirector:
             encounter = None
 
         if encounter:
-            # Score severity if your util supports it
             try:
                 encounter_severity = score_encounter_severity(
                     encounter,
@@ -195,7 +162,6 @@ class AIDirector:
                 except Exception:
                     encounter_severity = None
 
-            # Allow legacy reaction hook to mutate director_state.json-like data
             try:
                 encounter_reaction = await apply_director_reaction_from_encounter(
                     model_json=model_json,
@@ -204,10 +170,8 @@ class AIDirector:
                     guild_data=guild_data,
                     guild_id=guild_id,
                 )
-                # If the legacy function mutated the dict, we persist
                 _DIRECTOR_STATE.save()
             except TypeError:
-                # Simpler call fallback
                 try:
                     encounter_reaction = await apply_director_reaction_from_encounter(
                         _DIRECTOR_STATE.data,
@@ -221,12 +185,11 @@ class AIDirector:
             except Exception:
                 encounter_reaction = None
 
-            # Adjust severity upwards if encounter is nasty
             if isinstance(encounter_severity, int):
                 severity = max(severity, encounter_severity)
                 severity_label = AIDirector._severity_label(severity)
 
-        # 4) Ask the storyteller model for intro text (scene narration)
+        # 4) Storyteller intro text
         quest_hook = ""
         intro_text = ""
 
@@ -247,14 +210,12 @@ class AIDirector:
                 model_text=model_text,
                 context=prompt_context,
             )
-            # Allow intro_payload to be either string or dict
             if isinstance(intro_payload, str):
                 intro_text = intro_payload
             elif isinstance(intro_payload, dict):
                 intro_text = intro_payload.get("intro_text") or intro_payload.get("text") or ""
                 quest_hook = intro_payload.get("quest_hook") or ""
         except TypeError:
-            # older signature: (model_text, guild_data, guild_id, location_key, travelers, **kwargs)
             try:
                 intro_payload = await generate_storyteller_response(
                     model_text,
@@ -280,7 +241,6 @@ class AIDirector:
             intro_text = "The night moves, but the Director cannot find the words."
             quest_hook = ""
 
-        # 5) Final director snapshot
         director_update = _DIRECTOR_STATE.summarize()
 
         return {
