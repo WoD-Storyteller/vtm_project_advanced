@@ -17,35 +17,27 @@ DEFAULT_CHARACTER_STATE = {
     "predator_key": None,    # Normalized key, e.g. "alleycat"
     "frenzy_state": False,
 
-    # NEW: merits / flaws / convictions / touchstones
-    # merits/flaws: list of {"name", "dots", "type", "tags", "note"}
+    # Havens / Domain
+    "primary_haven_id": None,
+
+    # Merits / Flaws / Convictions / Touchstones
     "merits": [],
     "flaws": [],
-
-    # convictions: list of {"text"}
     "convictions": [],
-
-    # touchstones: list of {"name", "role", "alive": bool}
     "touchstones": [],
 }
 
 
 def ensure_character_state(player: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Ensures the V5 fields exist on a player dict.
-    Mutates the player dict in place.
-    """
     for k, v in DEFAULT_CHARACTER_STATE.items():
         if k not in player:
             player[k] = v if not isinstance(v, dict) else v.copy()
 
-    # ensure nested willpower keys
     wp = player["willpower"]
     wp.setdefault("max", 5)
     wp.setdefault("superficial", 0)
     wp.setdefault("aggravated", 0)
 
-    # ensure required keys on new structures
     if not isinstance(player.get("merits"), list):
         player["merits"] = []
     if not isinstance(player.get("flaws"), list):
@@ -58,9 +50,7 @@ def ensure_character_state(player: Dict[str, Any]) -> Dict[str, Any]:
     return player
 
 
-# -------------------------------------------------------------------
-# Willpower
-# -------------------------------------------------------------------
+# --- Willpower ---------------------------------------------------
 
 def current_willpower(player: Dict[str, Any]) -> int:
     ensure_character_state(player)
@@ -82,9 +72,7 @@ def set_willpower_damage(
     wp["aggravated"] = max(0, wp["aggravated"] + aggravated_delta)
 
 
-# -------------------------------------------------------------------
-# Hunger
-# -------------------------------------------------------------------
+# --- Hunger ------------------------------------------------------
 
 def get_hunger(player: Dict[str, Any]) -> int:
     ensure_character_state(player)
@@ -96,9 +84,7 @@ def set_hunger(player: Dict[str, Any], value: int):
     player["hunger"] = max(0, min(5, int(value)))
 
 
-# -------------------------------------------------------------------
-# Humanity / Stains
-# -------------------------------------------------------------------
+# --- Humanity / Stains -------------------------------------------
 
 def get_humanity(player: Dict[str, Any]) -> int:
     ensure_character_state(player)
@@ -124,9 +110,7 @@ def adjust_stains(player: Dict[str, Any], delta: int):
     set_stains(player, get_stains(player) + delta)
 
 
-# -------------------------------------------------------------------
-# Blood Potency
-# -------------------------------------------------------------------
+# --- Blood Potency -----------------------------------------------
 
 def get_blood_potency(player: Dict[str, Any]) -> int:
     ensure_character_state(player)
@@ -138,9 +122,7 @@ def set_blood_potency(player: Dict[str, Any], value: int):
     player["blood_potency"] = max(0, min(10, int(value)))
 
 
-# -------------------------------------------------------------------
-# Predator Type
-# -------------------------------------------------------------------
+# --- Predator Type -----------------------------------------------
 
 def get_predator_key(player: Dict[str, Any]) -> Optional[str]:
     ensure_character_state(player)
@@ -158,9 +140,19 @@ def set_predator_info(player: Dict[str, Any], key: Optional[str], display_name: 
     player["predator_type"] = display_name
 
 
-# -------------------------------------------------------------------
-# Merits & Flaws
-# -------------------------------------------------------------------
+# --- Havens / Domain ---------------------------------------------
+
+def get_primary_haven_id(player: Dict[str, Any]) -> Optional[str]:
+    ensure_character_state(player)
+    return player.get("primary_haven_id")
+
+
+def set_primary_haven_id(player: Dict[str, Any], haven_id: Optional[str]):
+    ensure_character_state(player)
+    player["primary_haven_id"] = haven_id
+
+
+# --- Merits & Flaws ----------------------------------------------
 
 def _norm_name(name: str) -> str:
     return name.strip().lower()
@@ -179,8 +171,6 @@ def list_flaws(player: Dict[str, Any]) -> List[Dict[str, Any]]:
 def add_merit(player: Dict[str, Any], name: str, dots: int, m_type: str = "general", tags=None, note: str = ""):
     ensure_character_state(player)
     tags = tags or []
-
-    # replace if exists with same name
     merits = player["merits"]
     n = _norm_name(name)
     merits = [m for m in merits if _norm_name(m.get("name", "")) != n]
@@ -203,7 +193,6 @@ def remove_merit(player: Dict[str, Any], name: str):
 def add_flaw(player: Dict[str, Any], name: str, dots: int, f_type: str = "general", tags=None, note: str = ""):
     ensure_character_state(player)
     tags = tags or []
-
     flaws = player["flaws"]
     n = _norm_name(name)
     flaws = [f for f in flaws if _norm_name(f.get("name", "")) != n]
@@ -223,9 +212,7 @@ def remove_flaw(player: Dict[str, Any], name: str):
     player["flaws"] = [f for f in player["flaws"] if _norm_name(f.get("name", "")) != n]
 
 
-# -------------------------------------------------------------------
-# Convictions
-# -------------------------------------------------------------------
+# --- Convictions -------------------------------------------------
 
 def list_convictions(player: Dict[str, Any]) -> List[Dict[str, Any]]:
     ensure_character_state(player)
@@ -243,9 +230,7 @@ def remove_conviction(player: Dict[str, Any], index: int):
         del player["convictions"][index]
 
 
-# -------------------------------------------------------------------
-# Touchstones
-# -------------------------------------------------------------------
+# --- Touchstones -------------------------------------------------
 
 def list_touchstones(player: Dict[str, Any]) -> List[Dict[str, Any]]:
     ensure_character_state(player)
