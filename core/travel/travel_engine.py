@@ -1,93 +1,65 @@
 from __future__ import annotations
 
 from typing import Dict, Any, Optional
-
-from core.travel.encounters import roll_encounter, Encounter
-from core.travel.zones_loader import ZoneRegistry
-
-
-class TravelResult:
-    def __init__(
-        self,
-        origin,
-        destination,
-        encounter: Optional[Encounter],
-        narrative: str,
-        director_impact: Dict[str, int],
-        new_location_key: str,
-    ):
-        self.origin = origin
-        self.destination = destination
-        self.encounter = encounter
-        self.narrative = narrative
-        self.director_impact = director_impact
-        self.new_location_key = new_location_key
+from core.travel.zones_loader import ZoneRegistry, Zone
+from core.travel.encounters import roll_encounter, is_encounter_triggered
+import random
 
 
 class TravelEngine:
+    """
+    Handles global travel between world zones.
+    """
 
     def __init__(self, registry: ZoneRegistry):
         self.registry = registry
 
-    def get_zone(self, key: str):
-        return self.registry.get(key)
+    # --------------------------------------------------
+    # Resolve zone from user input or fuzzy name
+    # --------------------------------------------------
 
-    def travel(self, player_data: Dict[str, Any], dest_key: str) -> TravelResult:
-        origin_key = player_data.get("location_key", self.registry.default_zone_key())
-        origin = self.get_zone(origin_key)
-        dest = self.get_zone(dest_key)
+    def resolve_zone(self, name: str) -> Optional[Zone]:
+        name = name.lower()
+        zone = self.registry.get(name)
+        if zone:
+            return zone
+        return self.registry.find(name)
 
-        if not dest:
-            dest = origin
+    # --------------------------------------------------
+    # Travel attempt: player -> new Zone
+    # --------------------------------------------------
 
-        import random
-        base_risk = dest.base_risk or {}
-        danger = base_risk.get("violence", 1)
-
-        encounter = None
-        if random.randint(1, 10) <= danger:
-            encounter = roll_encounter(dest.encounter_table)
-
-        name = player_data.get("name", "The Coterie")
-        lines = []
-
-        if origin_key == dest.key:
-            lines.append(f"{name} moves within **{dest.name}**.")
-        else:
-            lines.append(f"{name} travels from **{origin.name}** to **{dest.name}**.")
-
-        if encounter:
-            lines.append(f"Encounter: **{encounter.name}**")
-            lines.append(encounter.summary)
-        else:
-            lines.append("The journey passes without incident.")
-
-        impact = {
-            "violence": 0,
-            "masquerade": 0,
-            "second_inquisition": 0,
-            "occult": 0,
+    def travel(self, player_data: Dict[str, Any], dest_name: str) -> Dict[str, Any]:
+        """
+        Returns:
+        {
+          "success": bool,
+          "zone": Zone,
+          "encounter": {text, severity} or None,
+          "msg": str
         }
+        """
 
-        if encounter:
-            sev = encounter.base_severity
-            tags = set(encounter.tags)
-            if "violence" in tags:
-                impact["violence"] += sev
-            if "masquerade" in tags:
-                impact["masquerade"] += sev
-            if "second_inquisition" in tags:
-                impact["second_inquisition"] += sev
-            if "occult" in tags:
-                impact["occult"] += sev
+        zone = self.resolve_zone(dest_name)
+        if not zone:
+            return {
+                "success": False,
+                "zone": None,
+                "encounter": None,
+                "msg": f"I can't find a location matching '{dest_name}'."
+            }
 
-        player_data["location_key"] = dest.key
+        # Update player location
+        player_data["location_key"] = zone.key
 
-        return TravelResult(
-            origin=origin,
-            destination=dest,
-            encounter=encounter,
-            narrative="\n".join(lines),
-            director_impact=impact,
-            new_location_key=dest.key
-        )
+        # Try an encounter
+        encounter = None
+        if is_encounter_triggered(zone.base_risk):
+            encounter = roll_encounter(zone.encounter_table)
+
+        return {
+            "success": True,
+            "zone": zone,
+            "encounter": encounter,
+            "msg": f"You travel to **{zone.name}**."
+        }
