@@ -37,20 +37,6 @@ class PlayerCog(commands.Cog):
         result = travel_to(ctx.guild.id, ctx.author.id, location)
         await ctx.reply(result)
 
-    @commands.command(name="hunt")
-    async def hunt(self, ctx, *, predator_type=None):
-        data = get_guild_data(ctx.guild.id)
-        char = data["characters"].get(str(ctx.author.id))
-
-        if not char:
-            return await ctx.reply("You have no character.")
-
-        if predator_type or char.get("predator_type"):
-            result = predator_hunt(ctx.guild.id, ctx.author.id, predator_type)
-        else:
-            result = simple_feed(ctx.guild.id, ctx.author.id)
-
-        await ctx.reply(result)
 
     @commands.command(name="fear")
     async def fear(self, ctx, *, target):
