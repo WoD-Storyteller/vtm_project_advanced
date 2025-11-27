@@ -1,172 +1,91 @@
 from __future__ import annotations
 
 import random
-from typing import Dict, List, Optional
+from typing import Dict, Any, Optional
 
 
-class Encounter:
-    def __init__(
-        self,
-        eid: str,
-        name: str,
-        kind: str,
-        tags: List[str],
-        base_severity: int,
-        summary: str,
-    ):
-        self.id = eid
-        self.name = name
-        self.kind = kind
-        self.tags = tags
-        self.base_severity = base_severity
-        self.summary = summary
+# -------------------------------------------------------
+# BASIC TEMPLATE ENCOUNTER TABLES
+# Expand these freely or load from JSON if preferred.
+# -------------------------------------------------------
+
+ENCOUNTER_TABLES = {
+    "urban_camarilla": [
+        {"text": "A watchful Camarilla coterie tailing the PCs.", "severity": 2},
+        {"text": "A ghoul courier rushing through the streets.", "severity": 1},
+        {"text": "A primogen agent testing your loyalty.", "severity": 3},
+    ],
+
+    "anarch_cult": [
+        {"text": "A screaming revel of the Dreaming Shore.", "severity": 3},
+        {"text": "Lost soul begging for salvation.", "severity": 1},
+        {"text": "Cult prophet whispering doom.", "severity": 4},
+    ],
+
+    "sabbat_front": [
+        {"text": "A Sabbat pack scouting for bodies.", "severity": 4},
+        {"text": "A shovelhead testing the waters.", "severity": 3},
+        {"text": "The laughter of a Bishop's envoy.", "severity": 5},
+    ],
+
+    "elysium": [
+        {"text": "Harpy gossip dripping like poison.", "severity": 1},
+        {"text": "Keeper's assistant seeking favors.", "severity": 2},
+    ],
+
+    "thin_blood_industrial": [
+        {"text": "Thin-blood chemists experimenting.", "severity": 2},
+        {"text": "A frantic courier offering a dubious serum.", "severity": 3},
+    ],
+
+    "ministry_corridor": [
+        {"text": "Whispers of Set echo down hollow halls.", "severity": 2},
+        {"text": "A smuggler's ritual gone wrong.", "severity": 3},
+    ],
+
+    "hecata_necropolis": [
+        {"text": "A pale figure beckons from a tunnel.", "severity": 3},
+        {"text": "Ghostly echo of past sins.", "severity": 2},
+    ],
+
+    "nosferatu_tunnels": [
+        {"text": "A Nos sentry lurking in darkness.", "severity": 2},
+        {"text": "A flooded chamber full of whispers.", "severity": 3},
+    ],
+
+    "chunnel_endgame": [
+        {"text": "A Pentex strike team approaching.", "severity": 4},
+        {"text": "Sabbat ritual lights the tunnels red.", "severity": 5},
+    ],
+}
 
 
-ENCOUNTER_TABLES: Dict[str, List[Encounter]] = {}
+# -------------------------------------------------------
+# FUNCTIONS
+# -------------------------------------------------------
 
-
-def _add(table: str, enc: Encounter):
-    ENCOUNTER_TABLES.setdefault(table, []).append(enc)
-
-
-# Canterbury / Camarilla
-
-_add(
-    "urban_camarilla",
-    Encounter(
-        eid="can_cam_ghoul_watch",
-        name="Primogen's Ghoul",
-        kind="npc",
-        tags=["camarilla", "politics"],
-        base_severity=2,
-        summary="A Camarilla ghoul watches your movements too closely.",
-    )
-)
-
-_add(
-    "urban_camarilla",
-    Encounter(
-        eid="can_cam_patrol",
-        name="Camarilla Patrol",
-        kind="npc",
-        tags=["camarilla", "security"],
-        base_severity=3,
-        summary="A small coterie questions your presence in their streets.",
-    )
-)
-
-# Margate — Anarch Cult
-
-_add(
-    "anarch_cult",
-    Encounter(
-        eid="mar_cult_rite",
-        name="Bonfire Rite",
-        kind="event",
-        tags=["anarch", "cult", "masquerade"],
-        base_severity=3,
-        summary="A wild rite teeters between revel and riot.",
-    )
-)
-
-
-# Folkestone — Sabbat
-
-_add(
-    "sabbat_front",
-    Encounter(
-        eid="fol_sabbat_pack",
-        name="Sabbat Scout Pack",
-        kind="npc",
-        tags=["sabbat", "violence", "warfront"],
-        base_severity=4,
-        summary="A shovelhead pack sizes you up.",
-    )
-)
-
-
-# Dover — Hecata
-
-_add(
-    "hecata_necropolis",
-    Encounter(
-        eid="dov_hec_path",
-        name="Silent Funeral Cortege",
-        kind="npc",
-        tags=["hecata", "occult"],
-        base_severity=3,
-        summary="A procession of dead and living moves past in eerie silence.",
-    )
-)
-
-
-# Thin-Blood Industrial
-
-_add(
-    "thin_blood_industrial",
-    Encounter(
-        eid="tb_heist",
-        name="Rail Heist",
-        kind="event",
-        tags=["thin_blood", "violence"],
-        base_severity=4,
-        summary="Thin-bloods hijack a freight shipment.",
-    )
-)
-
-
-# Ministry Corridor
-
-_add(
-    "ministry_corridor",
-    Encounter(
-        eid="min_smuggling",
-        name="Smuggling Run",
-        kind="event",
-        tags=["ministry", "crime", "masquerade"],
-        base_severity=3,
-        summary="Cargo moves with more than mundane danger.",
-    )
-)
-
-
-# Nosferatu Tunnels
-
-_add(
-    "nosferatu_tunnels",
-    Encounter(
-        eid="nos_broker",
-        name="Nosferatu Info-Broker",
-        kind="npc",
-        tags=["nosferatu", "information"],
-        base_severity=2,
-        summary="Secrets traded in dripping dark tunnels.",
-    )
-)
-
-
-# Chunnel — Endgame
-
-_add(
-    "chunnel_endgame",
-    Encounter(
-        eid="chun_sabbat_ops",
-        name="Sabbat Logistics Node",
-        kind="npc",
-        tags=["sabbat", "endgame", "warfront"],
-        base_severity=5,
-        summary="You glimpse preparations for something catastrophic.",
-    )
-)
-
-
-def roll_encounter(table_key: str, danger_bonus: int = 0) -> Optional[Encounter]:
-    table = ENCOUNTER_TABLES.get(table_key, [])
+def roll_encounter(enc_table: str) -> Optional[Dict[str, Any]]:
+    """
+    Returns a random encounter dict:
+      { "text": str, "severity": int }
+    """
+    table = ENCOUNTER_TABLES.get(enc_table)
     if not table:
         return None
+    return random.choice(table)
 
-    weighted = []
-    for enc in table:
-        weighted.extend([enc] * (enc.base_severity + danger_bonus))
 
-    return random.choice(weighted)
+def is_encounter_triggered(base_risk: Dict[str, int]) -> bool:
+    """
+    Rolls against violence/masquerade/SI risk.
+    If any exceed a threshold, encounters may occur.
+    """
+    risk_pool = (
+        base_risk.get("violence", 1)
+        + base_risk.get("masquerade", 1)
+        + base_risk.get("si", 1)
+    )
+
+    chance = min(90, risk_pool * 10)
+    roll = random.randint(1, 100)
+    return roll <= chance
