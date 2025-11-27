@@ -171,3 +171,125 @@ class AIDirector:
             )
         except TypeError:
             # Simpler fallback signatures if your util is older
+            try:
+                encounter = await generate_random_encounter(
+                    model_json,
+                    location_key,
+                    guild_data,
+                )
+            except Exception:
+                encounter = None
+        except Exception:
+            encounter = None
+
+        if encounter:
+            # Score severity if your util supports it
+            try:
+                encounter_severity = score_encounter_severity(
+                    encounter,
+                    director_context,
+                )
+            except TypeError:
+                try:
+                    encounter_severity = score_encounter_severity(encounter)
+                except Exception:
+                    encounter_severity = None
+
+            # Allow legacy reaction hook to mutate director_state.json-like data
+            try:
+                encounter_reaction = await apply_director_reaction_from_encounter(
+                    model_json=model_json,
+                    director_data=_DIRECTOR_STATE.data,
+                    encounter=encounter,
+                    guild_data=guild_data,
+                    guild_id=guild_id,
+                )
+                # If the legacy function mutated the dict, we persist
+                _DIRECTOR_STATE.save()
+            except TypeError:
+                # Simpler call fallback
+                try:
+                    encounter_reaction = await apply_director_reaction_from_encounter(
+                        _DIRECTOR_STATE.data,
+                        encounter,
+                        guild_data,
+                        guild_id,
+                    )
+                    _DIRECTOR_STATE.save()
+                except Exception:
+                    encounter_reaction = None
+            except Exception:
+                encounter_reaction = None
+
+            # Adjust severity upwards if encounter is nasty
+            if isinstance(encounter_severity, int):
+                severity = max(severity, encounter_severity)
+                severity_label = AIDirector._severity_label(severity)
+
+        # 4) Ask the storyteller model for intro text (scene narration)
+        quest_hook = ""
+        intro_text = ""
+
+        prompt_context = {
+            "guild_id": guild_id,
+            "location_key": location_key,
+            "travelers": travelers,
+            "npcs": npcs,
+            "encounter": encounter,
+            "severity": severity,
+            "severity_label": severity_label,
+            "director_context": director_context,
+            "tags": tags,
+        }
+
+        try:
+            intro_payload = await generate_storyteller_response(
+                model_text=model_text,
+                context=prompt_context,
+            )
+            # Allow intro_payload to be either string or dict
+            if isinstance(intro_payload, str):
+                intro_text = intro_payload
+            elif isinstance(intro_payload, dict):
+                intro_text = intro_payload.get("intro_text") or intro_payload.get("text") or ""
+                quest_hook = intro_payload.get("quest_hook") or ""
+        except TypeError:
+            # older signature: (model_text, guild_data, guild_id, location_key, travelers, **kwargs)
+            try:
+                intro_payload = await generate_storyteller_response(
+                    model_text,
+                    guild_data,
+                    guild_id,
+                    location_key,
+                    travelers,
+                    npcs=npcs,
+                    encounter=encounter,
+                    severity=severity,
+                    severity_label=severity_label,
+                    tags=tags,
+                )
+                if isinstance(intro_payload, str):
+                    intro_text = intro_payload
+                elif isinstance(intro_payload, dict):
+                    intro_text = intro_payload.get("intro_text") or intro_payload.get("text") or ""
+                    quest_hook = intro_payload.get("quest_hook") or ""
+            except Exception:
+                intro_text = "The night moves, but the Director cannot find the words."
+                quest_hook = ""
+        except Exception:
+            intro_text = "The night moves, but the Director cannot find the words."
+            quest_hook = ""
+
+        # 5) Final director snapshot
+        director_update = _DIRECTOR_STATE.summarize()
+
+        return {
+            "intro_text": intro_text,
+            "npcs": npcs,
+            "encounter": encounter,
+            "quest_hook": quest_hook,
+            "severity": severity,
+            "severity_label": severity_label,
+            "director_update": director_update,
+            "encounter_reaction": encounter_reaction,
+        }
