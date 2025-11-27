@@ -1,121 +1,146 @@
 from __future__ import annotations
 
 import json
-from typing import Dict
 import os
+from typing import Dict, List
 
 import gspread
 from dotenv import load_dotenv
 
+from .haven_model import Haven
+from .haven_registry import HAVENS_JSON_PATH
+
 load_dotenv()
 
-ZONES_JSON_PATH = "data/zones.json"
-
-SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
-SERVICE_KEY = os.getenv("GOOGLE_SERVICE_ACCOUNT")  # either JSON string or path to key file
+HAVENS_SHEET_ID = os.getenv("GOOGLE_HAVENS_SHEET_ID")
+SERVICE_KEY = os.getenv("GOOGLE_SERVICE_ACCOUNT")  # JSON string or path
 
 
 def _get_gspread_client():
     if not SERVICE_KEY:
         raise RuntimeError("GOOGLE_SERVICE_ACCOUNT is not set in .env")
-
     key = SERVICE_KEY.strip()
     if key.startswith("{"):
-        # Treat as JSON string
         data = json.loads(key)
         return gspread.service_account_from_dict(data)
-    else:
-        # Treat as path to JSON credentials file
-        return gspread.service_account(filename=key)
+    return gspread.service_account(filename=key)
 
 
-def load_sheet_zones(sheet_id: str | None = None) -> Dict[str, dict]:
+def load_sheet_havens(sheet_id: str | None = None) -> Dict[str, Haven]:
     """
-    Loads a Google Sheet describing zones into a dict of zone_key -> zone_data.
+    Loads havens from a Google Sheet.
 
     Expected columns (case-insensitive, best-effort):
-      key, name, region, country, faction, danger,
-      lat, lng,
-      base_travel_hours,
-      violence_risk, masquerade_risk, si_risk, occult_risk,
-      tags, neighbours,
-      map_name, map_type, map_url
+
+      haven_id
+      name
+      owner_ids           (comma sep Discord IDs)
+      zone_key
+
+      lat
+      lng
+
+      security
+      luxury
+
+      feeding_domain
+      masquerade_buffer
+      warding_level
+      influence
+
+      rooms               (comma sep)
+      tags                (comma sep)
+
+      map_name
+      map_type
+      map_url
+
+    One row per haven *map* entry; multiple rows may share same haven_id.
     """
-    sheet_id = sheet_id or SHEET_ID
+    sheet_id = sheet_id or HAVENS_SHEET_ID
     if not sheet_id:
-        raise RuntimeError("GOOGLE_SHEET_ID is not set in .env")
+        raise RuntimeError("GOOGLE_HAVENS_SHEET_ID is not set in .env")
 
     gc = _get_gspread_client()
     sh = gc.open_by_key(sheet_id)
     ws = sh.sheet1
-
     rows = ws.get_all_records()
 
-    zones: Dict[str, dict] = {}
+    havens: Dict[str, Haven] = {}
 
     for row in rows:
-        key = str(row.get("key") or row.get("zone_key") or "").strip().lower()
-        if not key:
+        raw_id = row.get("haven_id") or row.get("id")
+        if not raw_id:
             continue
 
-        def _num(name, default=None):
-            v = row.get(name)
-            if v in ("", None):
-                return default
-            try:
-                return float(v)
-            except Exception:
-                return default
+        haven_id = str(raw_id).strip()
+        if not haven_id:
+            continue
 
-        lat = _num("lat")
-        lng = _num("lng")
-        danger = int(row.get("danger") or 2)
+        if haven_id not in havens:
+            owner_raw = row.get("owner_ids") or ""
+            owner_ids = [o.strip() for o in owner_raw.split(",") if o.strip()]
 
-        base_risk = {
-            "violence": int(row.get("violence_risk") or 1),
-            "masquerade": int(row.get("masquerade_risk") or 1),
-            "si": int(row.get("si_risk") or 1),
-            "occult": int(row.get("occult_risk") or 1),
-        }
+            def _num(name, default=None):
+                v = row.get(name)
+                if v in ("", None):
+                    return default
+                try:
+                    return float(v)
+                except Exception:
+                    return default
 
-        tags_raw = row.get("tags") or ""
-        neighbours_raw = row.get("neighbours") or ""
-        tags = [t.strip().lower() for t in tags_raw.split(",") if t.strip()]
-        neighbours = [n.strip().lower() for n in neighbours_raw.split(",") if n.strip()]
+            lat = _num("lat")
+            lng = _num("lng")
+            security = int(row.get("security") or 1)
+            luxury = int(row.get("luxury") or 1)
 
-        if key not in zones:
-            zones[key] = {
-                "key": key,
-                "name": row.get("name", key),
-                "region": row.get("region", ""),
-                "country": row.get("country", ""),
-                "faction": row.get("faction", ""),
-                "danger": danger,
-                "lat": lat,
-                "lng": lng,
-                "base_travel_hours": int(row.get("base_travel_hours") or 1),
-                "base_risk": base_risk,
-                "tags": tags,
-                "neighbours": neighbours,
-                "mymaps": [],
+            domain = {
+                "feeding": int(row.get("feeding_domain") or 0),
+                "masquerade_buffer": int(row.get("masquerade_buffer") or 0),
+                "warding_level": int(row.get("warding_level") or 0),
+                "influence": int(row.get("influence") or 0),
             }
 
-        map_entry = {
-            "map_name": row.get("map_name", ""),
-            "type": row.get("map_type", "mymaps"),
-            "url": row.get("map_url", ""),
-        }
+            rooms_raw = row.get("rooms") or ""
+            tags_raw = row.get("tags") or ""
+            rooms = [r.strip().lower() for r in rooms_raw.split(",") if r.strip()]
+            tags = [t.strip().lower() for t in tags_raw.split(",") if t.strip()]
 
-        if map_entry["map_name"] and map_entry["url"]:
-            zones[key]["mymaps"].append(map_entry)
+            havens[haven_id] = Haven(
+                id=haven_id,
+                name=row.get("name", haven_id),
+                zone_key=(row.get("zone_key") or "").strip().lower(),
+                owner_ids=owner_ids,
+                lat=lat,
+                lng=lng,
+                security=security,
+                luxury=luxury,
+                domain=domain,
+                rooms=rooms,
+                tags=tags,
+                maps=[],
+            )
 
-    return zones
+        haven = havens[haven_id]
+        map_name = row.get("map_name") or ""
+        map_url = row.get("map_url") or ""
+        map_type = row.get("map_type") or "mymaps"
+
+        if map_name and map_url:
+            haven.maps.append(
+                {
+                    "map_name": map_name,
+                    "url": map_url,
+                    "type": map_type,
+                }
+            )
+
+    return havens
 
 
-def save_zones_file(zones: Dict[str, dict], path: str = ZONES_JSON_PATH):
-    """
-    Writes zones.json to disk from a zones dict.
-    """
-    # zones is dict key -> zone_dict
+def save_havens_file(havens: Dict[str, Haven], path: str = HAVENS_JSON_PATH):
+    data = [h.to_dict() for h in havens.values()]
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(list(zones.values()), f, indent=4, ensure_ascii=False)
+        json.dump(data, f, indent=2, ensure_ascii=False)
