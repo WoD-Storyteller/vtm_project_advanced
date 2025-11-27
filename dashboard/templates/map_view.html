@@ -6,11 +6,54 @@
   href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
 />
 
-<div id="map" style="width:100%; height:90vh;"></div>
+<style>
+  #map {
+    width: 100%;
+    height: 90vh;
+  }
+  .map-filters {
+    position: absolute;
+    top: 70px;
+    left: 10px;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.75);
+    color: #f5f5f5;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    max-width: 220px;
+  }
+  .map-filters strong {
+    display: block;
+    margin-bottom: 4px;
+  }
+  .map-filters label {
+    display: block;
+    cursor: pointer;
+  }
+  .map-filters hr {
+    border: none;
+    border-top: 1px solid #555;
+    margin: 6px 0;
+  }
+</style>
+
+<div class="map-filters">
+  <strong>Filters</strong>
+  <label><input type="checkbox" id="filter_camarilla" checked> Camarilla</label>
+  <label><input type="checkbox" id="filter_anarch" checked> Anarch</label>
+  <label><input type="checkbox" id="filter_sabbat" checked> Sabbat</label>
+  <label><input type="checkbox" id="filter_si" checked> SI / Pentex</label>
+  <label><input type="checkbox" id="filter_other" checked> Other</label>
+  <hr />
+  <label><input type="checkbox" id="toggle_hunting" checked> Hunting Heat</label>
+  <label><input type="checkbox" id="toggle_players" checked> Player Tokens</label>
+</div>
+
+<div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://api.mapbox.com/mapbox.js/plugins/leaflet-omnivore/v0.3.4/leaflet-omnivore.min.js"></script>
-
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 <script src="/static/map/map.js"></script>
 
 {% endblock %}
