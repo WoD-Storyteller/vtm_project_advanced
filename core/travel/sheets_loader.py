@@ -7,7 +7,7 @@ import gspread
 ZONES_JSON_PATH = "data/zones.json"
 
 
-def load_sheet_zones(sheet_id="10A9sm0DMn3T5Xkglm9GoiXN3_D8DEKv_4uxL1P-lnl0/edit?usp=drivesdk" credentials_path="/opt/vtm_bot/bot/configs/just-sunrise-398717-bf23770e7b50.json") -> Dict[str, dict]:
+def load_sheet_zones(sheet_id: str, credentials_path: str) -> Dict[str, dict]:
     """
     Loads zone data from a Google Sheet and builds a zones.json structure.
 
@@ -16,9 +16,8 @@ def load_sheet_zones(sheet_id="10A9sm0DMn3T5Xkglm9GoiXN3_D8DEKv_4uxL1P-lnl0/edit
     key, name, description, tags,
     encounter_table,
     risk_violence, risk_masquerade, risk_si,
-    map_name, map_layer, map_label, map_url
-
-    Multiple rows may share the same `key` to define multiple MyMaps layers.
+    map_name, map_layer, map_label, map_url,
+    region, lat, lng, faction, hunting_risk, si_risk
     """
 
     gc = gspread.service_account(filename=credentials_path)
@@ -33,7 +32,6 @@ def load_sheet_zones(sheet_id="10A9sm0DMn3T5Xkglm9GoiXN3_D8DEKv_4uxL1P-lnl0/edit
         if not key:
             continue
 
-        # Create new zone entry
         if key not in zones:
             zones[key] = {
                 "key": key,
@@ -46,10 +44,15 @@ def load_sheet_zones(sheet_id="10A9sm0DMn3T5Xkglm9GoiXN3_D8DEKv_4uxL1P-lnl0/edit
                     "masquerade": int(row.get("risk_masquerade", 1)),
                     "si": int(row.get("risk_si", 1)),
                 },
+                "region": row.get("region", ""),
+                "lat": float(row.get("lat") or 0.0),
+                "lng": float(row.get("lng") or 0.0),
+                "faction": row.get("faction", ""),
+                "hunting_risk": int(row.get("hunting_risk", 0) or 0),
+                "si_risk": int(row.get("si_risk", 0) or 0),
                 "mymaps": [],
             }
 
-        # Add My Maps entry
         map_entry = {
             "map_name": row.get("map_name", ""),
             "layer": row.get("map_layer", ""),
