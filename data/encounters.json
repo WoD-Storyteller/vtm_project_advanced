@@ -1,0 +1,41 @@
+{
+  "urban_camarilla": [
+    { "text": "A watchful Camarilla coterie tails the coterie from a distance.", "severity": 2 },
+    { "text": "A tense meeting with a Primogen's ghoul courier.", "severity": 3 },
+    { "text": "An unexpected summons from a lesser Harpy.", "severity": 2 }
+  ],
+  "anarch_cult": [
+    { "text": "An ecstatic bonfire rite rages on the shoreline.", "severity": 3 },
+    { "text": "A broken mortal begs you to join 'the Dream'.", "severity": 2 },
+    { "text": "Cult enforcers watch you with painted faces.", "severity": 4 }
+  ],
+  "sabbat_front": [
+    { "text": "A Sabbat scout pack tests the edge of your domain.", "severity": 4 },
+    { "text": "You cross paths with a shovelhead 'hunting lesson'.", "severity": 3 },
+    { "text": "Whispers of a Bishop's war council in the night air.", "severity": 5 }
+  ],
+  "elysium": [
+    { "text": "Harpy gossip drips like poison in your ears.", "severity": 1 },
+    { "text": "The Keeper's assistant offers you a quiet warning.", "severity": 2 }
+  ],
+  "thin_blood_industrial": [
+    { "text": "Thin-blood chemists work a makeshift lab in a freight container.", "severity": 3 },
+    { "text": "Word spreads of a new thin-blood concoction changing hands in the rail yard.", "severity": 2 }
+  ],
+  "ministry_corridor": [
+    { "text": "A sermon about freedom and sin echoes in an empty warehouse.", "severity": 2 },
+    { "text": "Smugglers move cargo that hums with more than mundane danger.", "severity": 3 }
+  ],
+  "hecata_necropolis": [
+    { "text": "A silent funeral cortege passes through the tunnels beneath the necropolis.", "severity": 3 },
+    { "text": "Bone walls whisper old secrets to your Beast.", "severity": 3 }
+  ],
+  "nosferatu_tunnels": [
+    { "text": "A Nosferatu broker offers secrets in exchange for favors.", "severity": 2 },
+    { "text": "A partial tunnel collapse forces you to reroute through forgotten culverts.", "severity": 3 }
+  ],
+  "chunnel_endgame": [
+    { "text": "A Sabbat logistics node pulses with impending violence.", "severity": 5 },
+    { "text": "A Pentex black-ops team moves silver and UV hardware through the tunnel.", "severity": 5 }
+  ]
+}
