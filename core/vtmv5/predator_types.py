@@ -1,187 +1,230 @@
 from __future__ import annotations
 
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 # ---------------------------------------------------------------------------
-# FULL PREDATOR TYPE LIST FOR VAMPIRE: THE MASQUERADE (V5)
-# Organized as a JSON-like structure you can load directly
+# Full Predator Type list for Vampire: The Masquerade 5th Edition (V5)
 # ---------------------------------------------------------------------------
+
+def _norm(name: str) -> str:
+    return name.strip().lower().replace(" ", "_")
+
 
 PREDATOR_TYPES: Dict[str, Dict[str, Any]] = {
-    "Alleycat": {
-        "description": "You hunt by stalking, mugging, or attacking people for their blood.",
+    "alleycat": {
+        "key": "alleycat",
+        "name": "Alleycat",
+        "description": "Violent ambush predator hunting via muggings, assaults or direct attacks.",
         "feeding_style": "Violent ambush or assault feeding.",
         "bonuses": {
-            "skills": {
-                "Brawl": 1,
-                "Intimidation": 1,
-            },
+            "skills": {"Brawl": 1, "Intimidation": 1},
             "specialties": ["Intimidation: Stickups or Threats"],
-            "discipline_dots": ["Potence or Celerity"],
+            "discipline_dots": ["Potence", "Celerity"],
         },
         "advantages": ["Criminal Contacts (•)", "Streetwise (•)"],
-        "drawbacks": ["You regularly commit violent acts to feed, risking Masquerade breaches."],
+        "drawbacks": [
+            "You often commit violent crimes when feeding, risking Masquerade and legal trouble."
+        ],
     },
-
-    "Bagger": {
-        "description": "You feed from blood bags, morgues, or medical storage.",
-        "feeding_style": "Purchased or stolen medical blood.",
+    "bagger": {
+        "key": "bagger",
+        "name": "Bagger",
+        "description": "Feeds from stolen or purchased medical blood.",
+        "feeding_style": "Purchased or stolen bagged blood from hospitals and clinics.",
         "bonuses": {
             "skills": {"Larceny": 1},
-            "specialties": ["Larceny: Breaking into medical storage"],
+            "specialties": ["Larceny: Medical Theft"],
             "discipline_dots": ["Obfuscate"],
         },
-        "advantages": ["Resources (•) OR Contacts: Medical (•)"],
-        "drawbacks": ["Reduced Blood Potency effectiveness, bagged blood is thin (Hunger never drops below 2)."],
+        "advantages": ["Resources (•) or Contacts: Medical (•)"],
+        "drawbacks": [
+            "Bagged blood is thin: Hunger cannot be reduced below 2 when feeding only from bags."
+        ],
     },
-
-    "Blood_Leech": {
-        "description": "You hunt other vampires for their vitae.",
-        "feeding_style": "Vampire-on-vampire predation.",
+    "blood_leech": {
+        "key": "blood_leech",
+        "name": "Blood Leech",
+        "description": "You prey on other vampires for their vitae.",
+        "feeding_style": "Feeding primarily on Kindred rather than mortals.",
         "bonuses": {
             "skills": {"Brawl": 1, "Stealth": 1},
-            "discipline_dots": ["Fortitude or Protean or Celerity"],
+            "discipline_dots": ["Fortitude", "Protean", "Celerity"],
         },
-        "advantages": ["Add 2 Feeding-related dice pools when feeding on Kindred."],
+        "advantages": [
+            "Gain enhanced feeding when drinking from Kindred (can slake more Hunger at once)."
+        ],
         "drawbacks": [
-            "Hunted — other vampires may hunt you in return.",
-            "Feeding on mortals is less satisfying (Hunger only reduces by 1).",
+            "You are considered a threat by other vampires.",
+            "Feeding on mortals feels insufficient: mortal feeding is less effective."
         ],
     },
-
-    "Cleaver": {
-        "description": "You maintain a mortal family or household and feed secretly from them.",
-        "feeding_style": "Domestic feeding from loved ones.",
+    "cleaver": {
+        "key": "cleaver",
+        "name": "Cleaver",
+        "description": "Maintains a mortal family or domestic arrangement and feeds from them.",
+        "feeding_style": "Domestic feeding on family or household.",
         "bonuses": {
             "skills": {"Persuasion": 1},
-            "discipline_dots": ["Dominate or Auspex"],
+            "discipline_dots": ["Dominate", "Auspex"],
         },
-        "advantages": ["Retainers (•••) OR Herd (••)"],
+        "advantages": ["Retainers (•••) or Herd (••)"],
         "drawbacks": [
-            "You risk emotional attachment and Masquerade exposure.",
-            "Stains from harming your loved ones are doubled.",
+            "Harming or endangering your family or household is especially damning (extra Stains at ST discretion)."
         ],
     },
-
-    "Consensualist": {
-        "description": "You feed only from willing mortals.",
-        "feeding_style": "Seduction, negotiation, voluntary donors.",
+    "consensualist": {
+        "key": "consensualist",
+        "name": "Consensualist",
+        "description": "Feeds only from willing mortals and refuses to violate consent.",
+        "feeding_style": "Feeding exclusively from willing donors.",
         "bonuses": {
             "skills": {"Persuasion": 1, "Insight": 1},
-            "discipline_dots": ["Auspex or Dominate"],
+            "discipline_dots": ["Auspex", "Dominate"],
         },
-        "advantages": ["Contacts (•) among subcultures that normalize vampirism."],
-        "drawbacks": ["You gain a Stain if you ever feed without full consent."],
+        "advantages": ["Contacts (•) among kink, goth, or occult subcultures that accept feeding."],
+        "drawbacks": [
+            "You gain a Stain whenever you feed without genuine consent (ST final call)."
+        ],
     },
-
-    "Farmer": {
-        "description": "You avoid feeding on humans and prefer animals.",
-        "feeding_style": "Animal blood (thin, weak).",
+    "farmer": {
+        "key": "farmer",
+        "name": "Farmer",
+        "description": "Tries to subsist primarily on animals instead of human blood.",
+        "feeding_style": "Feeding on animals in fields, barns, or the wild.",
         "bonuses": {
             "skills": {"Survival": 1},
             "discipline_dots": ["Animalism"],
         },
-        "advantages": ["Animal Ken (•)"],
+        "advantages": ["Animal Ken (•) and easier access to animal Herds."],
         "drawbacks": [
-            "Animal blood is weak — Hunger cannot be reduced below 2.",
-            "Feeding takes longer (requires 2 feeding checks).",
+            "Animal blood is weak: Hunger cannot be reduced below 2 when feeding only from animals."
         ],
     },
-
-    "Osiris": {
-        "description": "You are a cult leader, influencer, musician, or charismatic figure.",
-        "feeding_style": "Mass adoration, cults, fans, followers.",
+    "osiris": {
+        "key": "osiris",
+        "name": "Osiris",
+        "description": "You are worshipped, adored, or centered in a cult, band, or movement.",
+        "feeding_style": "Feeding from cultists, fans, or congregants.",
         "bonuses": {
             "skills": {"Performance": 1, "Persuasion": 1},
-            "specialties": ["Performance: Your Art", "Persuasion: Followers"],
-            "discipline_dots": ["Presence"],
+            "discipline_dots": ["Presence", "Dominate"],
         },
-        "advantages": ["Fame (• or ••)", "Haven: Lair or Temple (••)"],
+        "advantages": ["Cult Herd (•••)", "Secure Haven tied to your cult (••)"],
         "drawbacks": [
-            "Your cult can become unruly, demanding, or suspicious.",
-            "Feeding failure attracts police or media attention."
+            "Your cult can spiral out of control, attract hunters, or demand miracles."
         ],
     },
-
-    "Sandman": {
-        "description": "You feed from sleeping victims by breaking into homes or shelters.",
-        "feeding_style": "Stealth-feeding on sleepers.",
+    "sandman": {
+        "key": "sandman",
+        "name": "Sandman",
+        "description": "Feeds from sleeping victims, slipping into homes or hospitals at night.",
+        "feeding_style": "Stealthy feeding from the sleeping.",
         "bonuses": {
             "skills": {"Stealth": 1, "Larceny": 1},
             "discipline_dots": ["Obfuscate"],
         },
-        "advantages": ["Add +2 dice to feeding on sleeping victims."],
-        "drawbacks": ["Breaking-and-entering risks Masquerade breaches and legal trouble."],
-    },
-
-    "Siren": {
-        "description": "You seduce, charm, or manipulate mortals before feeding.",
-        "feeding_style": "Seduction-driven feeding.",
-        "bonuses": {
-            "skills": {"Persuasion": 1, "Subterfuge": 1},
-            "specialties": ["Persuasion: Seduction"],
-            "discipline_dots": ["Presence"],
-        },
-        "advantages": ["Appearance-based bonuses with certain mortals."],
-        "drawbacks": ["You gain a Stain for feeding via deception without remorse."],
-    },
-    
-    "Osiris": {
-        "description": "You lead a cult or micro-religion, feeding from worshippers.",
-        "feeding_style": "Religious or charismatic dominance.",
-        "bonuses": {
-            "skills": {"Persuasion": 1, "Occult": 1},
-            "discipline_dots": ["Presence or Dominate"],
-        },
-        "advantages": ["Cult Herd (•••)", "Safe Haven (••)"],
+        "advantages": ["Add bonus dice when feeding from sleeping victims."],
         "drawbacks": [
-            "Your cult may demand 'miracles' or escalate dangerously.",
-            "Masquerade breaches become more likely as your cult grows."
+            "Breaking and entering constantly risks Masquerade breaches and legal trouble."
         ],
     },
-
-    "Scene_Queen": {
-        "description": "You hunt among nightlife scenes: clubs, raves, parties.",
-        "feeding_style": "High-society nightlife hunter.",
+    "siren": {
+        "key": "siren",
+        "name": "Siren",
+        "description": "Seduction-based predator who feeds from lovers and admirers.",
+        "feeding_style": "Feeding through seduction, romance, and lust.",
+        "bonuses": {
+            "skills": {"Persuasion": 1, "Subterfuge": 1},
+            "discipline_dots": ["Presence"],
+        },
+        "advantages": ["Often has a ready pool of potential lovers as Herd (• or ••)."],
+        "drawbacks": [
+            "Frequently manipulates emotions, potentially leading to extra Stains from betrayal or cruelty."
+        ],
+    },
+    "scene_queen": {
+        "key": "scene_queen",
+        "name": "Scene Queen",
+        "description": "Rules a subculture, club scene, or nightlife environment.",
+        "feeding_style": "Hunts in clubs, raves, festivals, and nightlife.",
         "bonuses": {
             "skills": {"Etiquette": 1, "Subterfuge": 1},
             "discipline_dots": ["Presence"],
         },
-        "advantages": ["Contacts: Nightlife (•)", "Fame (•)"],
-        "drawbacks": ["Drug-altered blood is unreliable and inconsistent."],
+        "advantages": ["Fame (•) and Contacts in nightlife or entertainment scenes."],
+        "drawbacks": [
+            "Drug- or alcohol-laced blood can cause complications or less effective feeding."
+        ],
     },
-
-    "Extortionist": {
-        "description": "You force mortals into feeding agreements through bribery or blackmail.",
-        "feeding_style": "Coercion and leverage.",
+    "extortionist": {
+        "key": "extortionist",
+        "name": "Extortionist",
+        "description": "Forces mortals into feeding arrangements using blackmail or threats.",
+        "feeding_style": "Coercive feeding with leverage, blackmail, or extortion.",
         "bonuses": {
             "skills": {"Intimidation": 1, "Subterfuge": 1},
             "discipline_dots": ["Dominate"],
         },
-        "advantages": ["Resources (•)", "Criminal Contacts (•)"],
-        "drawbacks": ["Mortals may betray you to authorities or hunters."],
+        "advantages": ["Resources (•) or Criminal Contacts (•) from illicit operations."],
+        "drawbacks": [
+            "Mortals may betray you to police or hunters when pushed too far."
+        ],
     },
-
-    "Graverobber": {
-        "description": "Feeds on corpses, morgues, or newly dead bodies.",
-        "feeding_style": "Feeding on cadavers.",
+    "graverobber": {
+        "key": "graverobber",
+        "name": "Graverobber",
+        "description": "Feeds on corpses, morgues, battlefield dead, or mortuaries.",
+        "feeding_style": "Feeds on the recently dead rather than the living.",
         "bonuses": {
             "skills": {"Medicine": 1, "Stealth": 1},
-            "discipline_dots": ["Obfuscate or Oblivion"],
+            "discipline_dots": ["Obfuscate", "Oblivion"],
         },
-        "advantages": ["Hunted less during feeding (corpse blood provides slow, weak reduction)."],
-        "drawbacks": ["Hunger cannot be reduced below 3 unless feeding from living targets."],
+        "advantages": ["Less risk of immediate Masquerade breach while feeding."],
+        "drawbacks": [
+            "Corpse blood is poor sustenance: Hunger cannot be reduced below 3 on corpses alone."
+        ],
     },
 }
 
-# ---------------------------------------------------------------------------
-# Helper Function
-# ---------------------------------------------------------------------------
 
-def get_predator_type(name: str) -> Dict[str, Any]:
+def list_predator_types() -> list[Dict[str, Any]]:
     """
-    Returns data for a predator type by key.
-    Case-insensitive and ignores spacing.
+    Returns a list of predator type dicts sorted by name.
     """
-    norm = name.lower().replace(" ", "_")
-    return PREDATOR_TYPES.get(norm)
+    return sorted(PREDATOR_TYPES.values(), key=lambda p: p["name"])
+
+
+def get_predator_type(name: str) -> Dict[str, Any] | None:
+    """
+    Returns predator type dict by name or key (case-insensitive).
+    """
+    key = _norm(name)
+    # direct key
+    if key in PREDATOR_TYPES:
+        return PREDATOR_TYPES[key]
+    # try matching by display name
+    for pt in PREDATOR_TYPES.values():
+        if _norm(pt["name"]) == key:
+            return pt
+    return None
+
+
+def apply_predator_type(player: Dict[str, Any], name: str) -> Dict[str, Any]:
+    """
+    Sets predator_type and predator_key on a player dict.
+    Does NOT automatically change skills or disciplines, since those
+    structures vary by implementation. Instead, it returns the predator
+    data so the calling code (or Storyteller) can apply changes.
+
+    Returns the predator_type dict or raises ValueError if not found.
+    """
+    from . import character_model  # local import to avoid circularity
+
+    pt = get_predator_type(name)
+    if not pt:
+        raise ValueError(f"Unknown predator type: {name}")
+
+    character_model.ensure_character_state(player)
+    character_model.set_predator_info(player, pt["key"], pt["name"])
+
+    return pt
