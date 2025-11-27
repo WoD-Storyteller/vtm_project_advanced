@@ -18,69 +18,64 @@ class TravelEngine:
     def __init__(self, registry: ZoneRegistry):
         self.registry = registry
 
-    def _get_origin_zone(self, player_data: Dict[str, Any]) -> Zone:
-        loc_key = player_data.get("location_key") or self.registry.default_zone_key()
-        origin = self.registry.get(loc_key)
-        if not origin:
-            origin = self.registry.get(self.registry.default_zone_key())
-        return origin
-
-    def resolve_zone(self, name: str) -> Optional[Zone]:
-        name = name.lower()
-        zone = self.registry.get(name)
-        if zone:
-            return zone
-        return self.registry.find(name)
-
     def _compute_time_cost(self, origin: Zone, dest: Zone) -> int:
         """
-        Simple travel time model:
-        - Cost is max(origin.travel_difficulty, dest.travel_difficulty)
-        - Always at least 1 hour.
-        """
-        return max(1, int(max(origin.travel_difficulty, dest.travel_difficulty)))
+        Very rough travel time in hours.
 
-    def travel(self, player_data: Dict[str, Any], dest_name: str) -> Dict[str, Any]:
+        For now:
+          - use dest.base_travel_hours as main value
+          - if region/country differ, + a bit
         """
-        Returns:
-        {
-          "success": bool,
-          "zone": Zone or None,
-          "origin": Zone or None,
-          "encounter": {text, severity} or None,
-          "msg": str,
-          "time_cost": int
-        }
-        """
-        origin = self._get_origin_zone(player_data)
-        dest = self.resolve_zone(dest_name)
+        base = dest.base_travel_hours or 1
 
+        if origin.region != dest.region:
+            base += 4
+        elif origin.country != dest.country:
+            base += 2
+
+        return max(1, base)
+
+    def _resolve_zone(self, key_or_name: str) -> Optional[Zone]:
+        z = self.registry.find(key_or_name)
+        return z
+
+    def travel(
+        self,
+        player: Dict[str, Any],
+        destination_key_or_name: str,
+    ) -> Dict[str, Any]:
+        """
+        Travel a PC from current location_key to a new zone.
+        """
+        origin_key = player.get("location_key") or self.registry.default_zone_key()
+        origin = self.registry.get(origin_key) or self.registry.find(origin_key)
+
+        if not origin:
+            # If their origin is invalid, snap them to default
+            origin = self.registry.get(self.registry.default_zone_key())
+
+        dest = self._resolve_zone(destination_key_or_name)
         if not dest:
             return {
                 "success": False,
+                "msg": f"Unknown destination: `{destination_key_or_name}`",
                 "zone": None,
-                "origin": origin,
-                "encounter": None,
-                "msg": f"I can't find a location matching '{dest_name}'.",
-                "time_cost": 0,
             }
 
-        # Update player location
-        player_data["location_key"] = dest.key
-
-        # Time cost
         time_cost = self._compute_time_cost(origin, dest)
 
-        # Encounter?
         encounter = None
         if is_encounter_triggered(dest.base_risk):
             encounter = roll_encounter(dest.encounter_table)
+
+        # Update player location key here
+        player["location_key"] = dest.key
 
         return {
             "success": True,
             "zone": dest,
             "origin": origin,
             "encounter": encounter,
-            "msg": f"You travel to **{dest.name}**.",
+            "msg": f"You travel from **{origin.name}** to **{dest.name}**.",
             "time_cost": time_cost,
         }
