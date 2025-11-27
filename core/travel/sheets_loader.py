@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 from typing import Dict
-import gspread
 import os
+
+import gspread
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -17,16 +18,21 @@ SERVICE_KEY = os.getenv("GOOGLE_SERVICE_ACCOUNT")
 def load_sheet_zones(sheet_id: str = None, credentials_path: str = None) -> Dict[str, dict]:
     """
     Loads zone data from Google Sheets and normalises it into the zones.json format.
-    Supports:
-      - Regions
-      - Coordinates
-      - Faction
-      - Hunting risk
-      - SI risk
-      - Multi-map entries (MyMaps, KML, layers)
+
+    Expected columns (headers in the Sheet):
+
+      key, name, description, tags,
+      encounter_table,
+      risk_violence, risk_masquerade, risk_si,
+      region, lat, lng,
+      faction, hunting_risk, si_risk,
+      travel_difficulty,
+      map_name, map_layer, map_label, map_url
+
+    Multiple rows with the same key are allowed to define multiple map entries.
     """
 
-    # Allow explicit args OR .env fallback
+    # Allow explicit arguments OR fall back to .env
     sheet_id = sheet_id or SHEET_ID
     credentials_path = credentials_path or SERVICE_KEY
 
@@ -42,39 +48,32 @@ def load_sheet_zones(sheet_id: str = None, credentials_path: str = None) -> Dict
         if not key:
             continue
 
-        # Initialize zone container
         if key not in zones:
             zones[key] = {
                 "key": key,
                 "name": row.get("name", ""),
                 "description": row.get("description", ""),
-
                 "tags": [
                     t.strip()
-                    for t in row.get("tags", "").split(",")
+                    for t in str(row.get("tags", "")).split(",")
                     if t.strip()
                 ],
-
                 "encounter_table": row.get("encounter_table", ""),
-
                 "base_risk": {
-                    "violence": int(row.get("risk_violence", 1)),
-                    "masquerade": int(row.get("risk_masquerade", 1)),
-                    "si": int(row.get("risk_si", 1)),
+                    "violence": int(row.get("risk_violence", 1) or 1),
+                    "masquerade": int(row.get("risk_masquerade", 1) or 1),
+                    "si": int(row.get("risk_si", 1) or 1),
                 },
-
                 "region": row.get("region", ""),
                 "lat": float(row.get("lat") or 0.0),
                 "lng": float(row.get("lng") or 0.0),
-
                 "faction": row.get("faction", ""),
-                "hunting_risk": int(row.get("hunting_risk", 0)),
-                "si_risk": int(row.get("si_risk", 0)),
-
+                "hunting_risk": int(row.get("hunting_risk", 0) or 0),
+                "si_risk": int(row.get("si_risk", 0) or 0),
+                "travel_difficulty": int(row.get("travel_difficulty", 1) or 1),
                 "mymaps": [],
             }
 
-        # Add map entry for this row
         map_entry = {
             "map_name": row.get("map_name", ""),
             "layer": row.get("map_layer", ""),
