@@ -3,22 +3,32 @@ from __future__ import annotations
 import json
 from typing import Dict
 import gspread
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 ZONES_JSON_PATH = "data/zones.json"
 
+SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
+SERVICE_KEY = os.getenv("GOOGLE_SERVICE_ACCOUNT")
 
-def load_sheet_zones(sheet_id: str, credentials_path: str) -> Dict[str, dict]:
+
+def load_sheet_zones(sheet_id: str = None, credentials_path: str = None) -> Dict[str, dict]:
     """
-    Loads zone data from a Google Sheet and builds a zones.json structure.
-
-    Expected columns:
-
-    key, name, description, tags,
-    encounter_table,
-    risk_violence, risk_masquerade, risk_si,
-    map_name, map_layer, map_label, map_url,
-    region, lat, lng, faction, hunting_risk, si_risk
+    Loads zone data from Google Sheets and normalises it into the zones.json format.
+    Supports:
+      - Regions
+      - Coordinates
+      - Faction
+      - Hunting risk
+      - SI risk
+      - Multi-map entries (MyMaps, KML, layers)
     """
+
+    # Allow explicit args OR .env fallback
+    sheet_id = sheet_id or SHEET_ID
+    credentials_path = credentials_path or SERVICE_KEY
 
     gc = gspread.service_account(filename=credentials_path)
     sh = gc.open_by_key(sheet_id)
@@ -32,27 +42,39 @@ def load_sheet_zones(sheet_id: str, credentials_path: str) -> Dict[str, dict]:
         if not key:
             continue
 
+        # Initialize zone container
         if key not in zones:
             zones[key] = {
                 "key": key,
                 "name": row.get("name", ""),
                 "description": row.get("description", ""),
-                "tags": [t.strip() for t in row.get("tags", "").split(",") if t.strip()],
+
+                "tags": [
+                    t.strip()
+                    for t in row.get("tags", "").split(",")
+                    if t.strip()
+                ],
+
                 "encounter_table": row.get("encounter_table", ""),
+
                 "base_risk": {
                     "violence": int(row.get("risk_violence", 1)),
                     "masquerade": int(row.get("risk_masquerade", 1)),
                     "si": int(row.get("risk_si", 1)),
                 },
+
                 "region": row.get("region", ""),
                 "lat": float(row.get("lat") or 0.0),
                 "lng": float(row.get("lng") or 0.0),
+
                 "faction": row.get("faction", ""),
-                "hunting_risk": int(row.get("hunting_risk", 0) or 0),
-                "si_risk": int(row.get("si_risk", 0) or 0),
+                "hunting_risk": int(row.get("hunting_risk", 0)),
+                "si_risk": int(row.get("si_risk", 0)),
+
                 "mymaps": [],
             }
 
+        # Add map entry for this row
         map_entry = {
             "map_name": row.get("map_name", ""),
             "layer": row.get("map_layer", ""),
@@ -67,5 +89,8 @@ def load_sheet_zones(sheet_id: str, credentials_path: str) -> Dict[str, dict]:
 
 
 def save_zones_file(zones: Dict[str, dict], path: str = ZONES_JSON_PATH):
+    """
+    Writes zones.json to disk.
+    """
     with open(path, "w", encoding="utf-8") as f:
         json.dump(list(zones.values()), f, indent=4, ensure_ascii=False)
