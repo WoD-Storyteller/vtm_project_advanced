@@ -26,6 +26,8 @@ class VTM(commands.Bot):
         await self.load_extension("cogs.disciplines")
         # in your bot startup
         await bot.load_extension("cogs.vtm_v5")
+        # wherever you load cogs
+        await bot.load_extension("cogs.hunting")
     async def on_ready(self):
         print(f"Bot online as {self.user}")
 
