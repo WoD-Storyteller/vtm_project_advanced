@@ -164,3 +164,5 @@ class HuntingEngine:
             "dice_result": roll_result,
             "feeding_result": feeding_result,
             "predator_type": character_model.get_predator_type_name(player),
+            "notes": dice_block["notes"],
+        }
