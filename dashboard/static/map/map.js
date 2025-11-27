@@ -1,8 +1,12 @@
-let map = L.map("map").setView([20, 0], 2); // world view
+// --- BASE MAP INITIALIZATION ---
+
+let map = L.map("map").setView([20, 0], 2); // world-ish default view
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
 }).addTo(map);
+
+// --- LAYERS ---
 
 let zoneLayerGroup = L.layerGroup().addTo(map);
 let playerLayerGroup = L.layerGroup().addTo(map);
@@ -11,7 +15,8 @@ let huntingHeatLayer = null;
 let zonesData = [];
 let playersData = [];
 
-// faction -> color
+// --- HELPERS ---
+
 function factionColor(f) {
   if (!f) return "#7f8c8d";
   f = f.toLowerCase();
@@ -21,38 +26,46 @@ function factionColor(f) {
   if (f.includes("ministry")) return "#8e44ad";
   if (f.includes("hecata")) return "#16a085";
   if (f.includes("thin")) return "#f1c40f";
-  if (f.includes("si") || f.includes("inquisition") || f.includes("pentex")) return "#e74c3c";
+  if (f.includes("si") || f.includes("inquisition") || f.includes("pentex"))
+    return "#e74c3c";
   return "#7f8c8d";
 }
 
 function passesFactionFilter(z) {
   const f = (z.faction || "").toLowerCase();
-  const tags = (z.tags || []).map(t => t.toLowerCase());
+  const tags = (z.tags || []).map((t) => t.toLowerCase());
 
   const camOn = document.getElementById("filter_camarilla").checked;
   const anaOn = document.getElementById("filter_anarch").checked;
   const sabOn = document.getElementById("filter_sabbat").checked;
-  const siOn  = document.getElementById("filter_si").checked;
+  const siOn = document.getElementById("filter_si").checked;
   const othOn = document.getElementById("filter_other").checked;
 
-  const isCam = f.includes("camarilla");
-  const isAn  = f.includes("anarch");
-  const isSab = f.includes("sabbat");
-  const isSi  = f.includes("si") || f.includes("inquisition") || f.includes("pentex");
+  const isCam = f.includes("camarilla") || tags.includes("camarilla");
+  const isAn = f.includes("anarch") || tags.includes("anarch");
+  const isSab = f.includes("sabbat") || tags.includes("sabbat");
+  const isSi =
+    f.includes("si") ||
+    f.includes("inquisition") ||
+    f.includes("pentex") ||
+    tags.includes("si") ||
+    tags.includes("second_inquisition");
 
   if (isCam && !camOn) return false;
-  if (isAn  && !anaOn) return false;
+  if (isAn && !anaOn) return false;
   if (isSab && !sabOn) return false;
-  if (isSi  && !siOn)  return false;
+  if (isSi && !siOn) return false;
   if (!isCam && !isAn && !isSab && !isSi && !othOn) return false;
 
   return true;
 }
 
+// --- RENDERING FUNCTIONS ---
+
 function renderZones() {
   zoneLayerGroup.clearLayers();
 
-  zonesData.forEach(z => {
+  zonesData.forEach((z) => {
     if (!z.lat || !z.lng) return;
     if (!passesFactionFilter(z)) return;
 
@@ -61,7 +74,7 @@ function renderZones() {
       radius: 6,
       color: color,
       fillColor: color,
-      fillOpacity: 0.8,
+      fillOpacity: 0.85,
     });
 
     const desc = z.description || "";
@@ -84,7 +97,7 @@ function renderPlayers() {
 
   if (!document.getElementById("toggle_players").checked) return;
 
-  playersData.forEach(p => {
+  playersData.forEach((p) => {
     if (!p.lat || !p.lng) return;
 
     const marker = L.marker([p.lat, p.lng], {
@@ -111,42 +124,55 @@ function renderHuntingHeat() {
   if (!document.getElementById("toggle_hunting").checked) return;
 
   const points = [];
-  zonesData.forEach(z => {
+  zonesData.forEach((z) => {
     if (!z.lat || !z.lng) return;
     if (z.hunting_risk && z.hunting_risk > 0) {
-      // heatmap values are [lat, lng, intensity 0-1]
-      points.push([z.lat, z.lng, Math.min(1, z.hunting_risk / 5)]);
+      const intensity = Math.min(1, z.hunting_risk / 5);
+      points.push([z.lat, z.lng, intensity]);
     }
   });
 
   if (points.length > 0) {
-    huntingHeatLayer = L.heatLayer(points, { radius: 25, blur: 15 }).addTo(map);
+    huntingHeatLayer = L.heatLayer(points, { radius: 25, blur: 18 }).addTo(map);
   }
 }
 
-// --- Fetch data from API --- //
+// --- DATA LOADING ---
 
 async function loadZones() {
-  const res = await fetch("/api/map/zones");
-  zonesData = await res.json();
-  renderZones();
-  renderHuntingHeat();
+  try {
+    const res = await fetch("/api/map/zones");
+    zonesData = await res.json();
+    renderZones();
+    renderHuntingHeat();
+  } catch (err) {
+    console.error("Failed to load zones:", err);
+  }
 }
 
 async function loadPlayers() {
-  const res = await fetch("/api/map/players");
-  playersData = await res.json();
-  renderPlayers();
+  try {
+    const res = await fetch("/api/map/players");
+    playersData = await res.json();
+    renderPlayers();
+  } catch (err) {
+    console.error("Failed to load players:", err);
+  }
 }
 
 async function loadDirectorState() {
-  const res = await fetch("/api/map/state");
-  const state = await res.json();
-  // You can use this later to animate some global threat indicators in UI
-  console.log("Director state:", state);
+  try {
+    const res = await fetch("/api/map/state");
+    const state = await res.json();
+    // You can use this later to display global threat level etc.
+    console.log("Director state:", state);
+  } catch (err) {
+    console.error("Failed to load director state:", err);
+  }
 }
 
-// Attach filter listeners
+// --- FILTER HOOKS ---
+
 document.getElementById("filter_camarilla").addEventListener("change", () => {
   renderZones();
 });
@@ -169,12 +195,13 @@ document.getElementById("toggle_players").addEventListener("change", () => {
   renderPlayers();
 });
 
-// initial load
+// --- INITIAL LOAD & POLLING ---
+
 loadZones();
 loadPlayers();
 loadDirectorState();
 
-// periodic refresh (pseudo real-time)
+// Refresh players + director state periodically (pseudo real-time)
 setInterval(() => {
   loadPlayers();
   loadDirectorState();
