@@ -5,137 +5,102 @@ from utils import get_guild_data, generate_hunt_victim
 from core.vtmv5.hunting_engine import HuntingEngine
 from core.vtmv5 import character_model
 from core.travel.zones_loader import ZoneRegistry
+from core.director.ai_director import _V5_DIRECTOR, _DIRECTOR_STATE
 
 
 class HuntingCommands(commands.Cog):
     """
     Hunting commands:
-      !hunt_victim <location>  – narrative victim generator
-      !hunt                    – V5 Predator-aware hunting + feeding
+      !hunt_victim <location>  – narrative victim generator (simple)
+      !hunt                    – V5 Predator-aware hunting + feeding,
+                                 wired into the V5 Director.
     """
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        # Use global registry if bot already has one
+        self.registry: ZoneRegistry = getattr(bot, "zone_registry", ZoneRegistry())
+        self.registry.load()
         self.engine = HuntingEngine()
 
-    async def cog_check(self, ctx):
-        # later you can restrict by channel/role if you want
-        return True
-
-    # ----------------------------------------------------
-    # !hunt_victim – keep your existing flavour helper
-    # ----------------------------------------------------
+    # -------------------------------------------------
+    # Simple narrative victim generator
+    # -------------------------------------------------
     @commands.command(name="hunt_victim")
-    async def hunt_victim(self, ctx, *, location: str):
+    async def hunt_victim(self, ctx: commands.Context, *, location: str):
         """
-        Generates a random mortal victim for narrative hunting scenes.
-        Uses your existing generate_hunt_victim AI helper.
+        Legacy/simple: generate a narrative victim for a given textual location.
         """
         guild_data = get_guild_data(self.bot.data_store, ctx.guild.id)
-        player_data = guild_data.get("players", {}).get(str(ctx.author.id))
-
-        async with ctx.typing():
-            victim_data = await generate_hunt_victim(
-                getattr(self.bot, "ai_model_json", None),
-                location,
-                player_data,
-            )
-
-        if not victim_data:
-            return await ctx.reply("I couldn't generate a victim right now.")
-
-        # Try to interpret victim_data flexibly
-        if isinstance(victim_data, str):
-            name = "Unfortunate Mortal"
-            desc = victim_data
-        elif isinstance(victim_data, dict):
-            name = victim_data.get("name", "Unfortunate Mortal")
-            desc = victim_data.get("description") or victim_data.get("blurb") or ""
-        else:
-            name = "Unfortunate Mortal"
-            desc = str(victim_data)
-
-        embed = discord.Embed(
-            title=f"Hunt Victim – {name}",
-            description=desc,
-            color=discord.Color.dark_red(),
+        text = await generate_hunt_victim(
+            model=self.bot.ai_model_text,
+            guild_data=guild_data,
+            guild_id=ctx.guild.id,
+            location=location,
+            author_id=ctx.author.id,
         )
-        await ctx.send(embed=embed)
+        await ctx.send(text)
 
-    # ----------------------------------------------------
-    # !hunt – V5 Predator-aware hunting + feeding
-    # ----------------------------------------------------
+    # -------------------------------------------------
+    # Full V5 hunting
+    # -------------------------------------------------
     @commands.command(name="hunt")
-    async def hunt(self, ctx):
+    async def hunt(self, ctx: commands.Context):
         """
-        Perform a Predator-type–aware V5 hunting roll in your current zone.
-        Applies hunger changes via the V5 feeding engine.
+        Perform a full V5-compatible hunt using HuntingEngine,
+        zone data, Predator types, and update the V5 Director.
         """
         guild_data = get_guild_data(self.bot.data_store, ctx.guild.id)
-        player = guild_data.get("players", {}).get(str(ctx.author.id))
+        players = guild_data.get("players") or {}
+        player = players.get(str(ctx.author.id))
 
         if not player:
-            return await ctx.reply("You don't have a character sheet yet.")
+            return await ctx.reply("You do not have a character sheet.")
 
         character_model.ensure_character_state(player)
 
-        # Resolve current zone
-        loc_key = player.get("location_key")
-        registry = getattr(self.bot, "zone_registry", None)
-        if registry is None:
-            registry = ZoneRegistry()
-            registry.load()
-            self.bot.zone_registry = registry
+        location_key = player.get("location_key") or self.registry.default_zone_key()
+        zone = self.registry.get(location_key)
 
-        zone = registry.get(loc_key) or registry.get(registry.default_zone_key())
         if not zone:
-            return await ctx.reply("You seem to be nowhere… I can't find your current hunting zone.")
+            return await ctx.reply(
+                f"Your current location `{location_key}` is not a valid zone."
+            )
 
-        # Run the engine
-        result = self.engine.hunt(player, zone)
-        self.bot.save_data()
+        async with ctx.typing():
+            hunt_result = self.engine.hunt(player, zone)
+            # Wire this hunt into the V5 Director
+            directives = _V5_DIRECTOR.on_hunt(player, hunt_result, zone=zone)
+            _DIRECTOR_STATE.save()
 
-        dice_res = result["dice_result"]
-        feeding = result["feeding_result"]
+        dice_res = hunt_result["dice_result"]
+        feeding = hunt_result["feeding_result"]
 
-        normal_dice_str = " ".join(str(d) for d in dice_res["dice"])
-        hunger_dice_str = " ".join(str(d) for d in dice_res["hunger_dice"])
+        messy = dice_res.get("messy_critical", False)
+        bestial = dice_res.get("bestial_failure", False)
+        successes = dice_res.get("successes", 0)
 
+        title = f"Hunt in {hunt_result['zone_name']}"
         embed = discord.Embed(
-            title=f"Hunt – {player.get('name', ctx.author.display_name)}",
+            title=title,
+            description="\n".join(hunt_result["notes"]),
             color=discord.Color.dark_red(),
         )
 
-        embed.add_field(name="Zone", value=f"{result['zone_name']} (`{result['zone_key']}`)", inline=False)
-        embed.add_field(name="Predator Type", value=result["predator_type"] or "None", inline=True)
-        embed.add_field(name="Dice Pool", value=str(result["dice_pool"]), inline=True)
-        embed.add_field(name="Hunger Before", value=str(result["hunger_before"]), inline=True)
-
         embed.add_field(
-            name="Dice Rolled",
-            value=f"Normal: {normal_dice_str or '—'}\nHunger: {hunger_dice_str or '—'}",
+            name="Dice Pool",
+            value=f"{hunt_result['dice_pool']} dice (Hunger {hunt_result['hunger_before']})",
             inline=False,
         )
-
-        notes = []
-        notes.append(f"Successes: {dice_res['successes']}")
-        if dice_res["critical_pairs"] > 0:
-            notes.append(f"Critical pairs: {dice_res['critical_pairs']}")
-        if dice_res["messy_critical"]:
-            notes.append("💥 Messy Critical")
-        if dice_res["bestial_failure"]:
-            notes.append("🐺 Bestial Failure")
-        if dice_res["total_success"]:
-            notes.append("✅ You successfully feed.")
-        else:
-            notes.append("❌ You fail to find a safe vessel.")
-
-        embed.add_field(name="Roll Outcome", value="\n".join(notes), inline=False)
-
-        # Feeding result
-        feed_notes = feeding.get("notes") or []
-        feed_notes_str = "\n".join(feed_notes) if feed_notes else "—"
-
+        embed.add_field(
+            name="Result",
+            value=(
+                f"Successes: **{successes}**\n"
+                f"Messy Critical: **{messy}**\n"
+                f"Bestial Failure: **{bestial}**"
+            ),
+            inline=False,
+        )
         embed.add_field(
             name="Feeding",
             value=(
@@ -144,11 +109,35 @@ class HuntingCommands(commands.Cog):
             ),
             inline=False,
         )
+
+        # Director state snippet after this hunt
+        city_state = directives.get("city_state", {})
+        personal = directives.get("personal", {})
+
         embed.add_field(
-            name="Predator Rules",
-            value=feed_notes_str,
+            name="City Pressure (Director)",
+            value=(
+                f"Masquerade: {city_state.get('masquerade_pressure', 0)}\n"
+                f"Violence: {city_state.get('violence_pressure', 0)}\n"
+                f"Occult: {city_state.get('occult_pressure', 0)}\n"
+                f"SI: {city_state.get('si_pressure', 0)}\n"
+                f"Politics: {city_state.get('political_pressure', 0)}\n"
+                f"Global Threat: {city_state.get('global_threat', 1)}"
+            ),
             inline=False,
         )
+
+        if personal:
+            embed.add_field(
+                name="Personal State",
+                value=(
+                    f"Humanity: {personal.get('humanity')}\n"
+                    f"Stains: {personal.get('stains')}\n"
+                    f"Hunger: {personal.get('hunger')}\n"
+                    f"Predator Type: {personal.get('predator_type')}"
+                ),
+                inline=False,
+            )
 
         await ctx.send(embed=embed)
 
