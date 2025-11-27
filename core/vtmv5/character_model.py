@@ -13,7 +13,8 @@ DEFAULT_CHARACTER_STATE = {
     "humanity": 7,
     "stains": 0,
     "blood_potency": 1,
-    "predator_type": None,
+    "predator_type": None,   # Display name, e.g. "Alleycat"
+    "predator_key": None,    # Normalized key, e.g. "alleycat"
     "frenzy_state": False,
     # optional:
     # "convictions": [ ... ],
@@ -101,3 +102,19 @@ def get_blood_potency(player: Dict[str, Any]) -> int:
 def set_blood_potency(player: Dict[str, Any], value: int):
     ensure_character_state(player)
     player["blood_potency"] = max(0, min(10, int(value)))
+
+
+def get_predator_key(player: Dict[str, Any]) -> str | None:
+    ensure_character_state(player)
+    return player.get("predator_key")
+
+
+def get_predator_type_name(player: Dict[str, Any]) -> str | None:
+    ensure_character_state(player)
+    return player.get("predator_type")
+
+
+def set_predator_info(player: Dict[str, Any], key: str | None, display_name: str | None):
+    ensure_character_state(player)
+    player["predator_key"] = key
+    player["predator_type"] = display_name
