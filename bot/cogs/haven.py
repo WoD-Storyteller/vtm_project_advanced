@@ -14,14 +14,14 @@ class HavenCog(commands.Cog):
     Player & ST Haven / Domain commands.
 
     Player:
-      !havens                  – list your havens
-      !haven here <name>       – create a haven in your current zone
-      !haven create <zone> <name> – create a haven by zone key/name
-      !haven info <id|name>    – show haven details
-      !haven primary <id|name> – set your primary haven
+      !havens                     – list your havens
+      !haven_here <name>          – create a haven in your current zone
+      !haven <zone> <name>        – create a haven by zone key/name
+      !haven_info <id|name>       – show haven details
+      !haven_primary <id|name>    – set your primary haven
 
     ST:
-      !sync_havens             – sync havens from Google Sheet
+      !sync_havens                – sync havens from Google Sheet
     """
 
     def __init__(self, bot: commands.Bot):
@@ -130,6 +130,7 @@ class HavenCog(commands.Cog):
         # If they have no primary haven yet, set this as primary
         if not character_model.get_primary_haven_id(player):
             character_model.set_primary_haven_id(player, haven.id)
+            # Persist player data
             self.bot.save_data()
 
         description = self._format_haven(haven)
