@@ -16,11 +16,15 @@
     </div>
   </div>
 
-  <main>
-    <header id="player_header">
+  <main id="main_layout">
+    <header id="header_bar">
+      <div>
+        <h1>Player Dashboard</h1>
+        <p>Create and manage your Kindred characters.</p>
+      </div>
       <div id="char_selector">
-        <label>Character</label>
-        <select id="character_select"></select>
+        <label for="char_list">Your Characters</label>
+        <select id="char_list"></select>
         <button id="new_char_btn">New Character</button>
       </div>
     </header>
@@ -31,6 +35,7 @@
       <button class="tab-button" data-target="tab_skills">Skills</button>
       <button class="tab-button" data-target="tab_disciplines">Disciplines</button>
       <button class="tab-button" data-target="tab_health">Health / Willpower / Hunger</button>
+      <button class="tab-button" data-target="tab_v5">V5 Morality & Traits</button>
       <button class="tab-button" data-target="tab_inventory">Inventory</button>
       <button class="tab-button" data-target="tab_boons">Boons</button>
       <button class="tab-button" data-target="tab_xp">XP</button>
@@ -59,7 +64,7 @@
         </div>
         <div class="field">
           <label>Generation</label>
-          <input id="input_gen" />
+          <input id="input_gen" type="number" min="4" max="16" />
         </div>
         <div class="field">
           <label>Concept</label>
@@ -142,6 +147,37 @@
       </div>
     </section>
 
+    <!-- NEW: V5 Morality & Traits -->
+    <section id="tab_v5" class="tab-pane">
+      <h2>V5 Morality & Traits</h2>
+      <div class="grid three-cols">
+        <div class="field">
+          <h3>Morality</h3>
+          <label>Humanity</label><input id="humanity" type="number" min="0" max="10" />
+          <label>Stains</label><input id="stains" type="number" min="0" max="10" />
+          <label>Blood Potency</label><input id="blood_potency" type="number" min="0" max="10" />
+        </div>
+        <div class="field">
+          <h3>Merits</h3>
+          <textarea id="merits_text" placeholder="One merit per line: Name | dots | type | note"></textarea>
+        </div>
+        <div class="field">
+          <h3>Flaws</h3>
+          <textarea id="flaws_text" placeholder="One flaw per line: Name | dots | type | note"></textarea>
+        </div>
+      </div>
+      <div class="grid two-cols">
+        <div class="field">
+          <h3>Convictions</h3>
+          <textarea id="convictions_text" placeholder="One conviction per line"></textarea>
+        </div>
+        <div class="field">
+          <h3>Touchstones</h3>
+          <textarea id="touchstones_text" placeholder="One per line: Name | role | alive/dead"></textarea>
+        </div>
+      </div>
+    </section>
+
     <section id="tab_inventory" class="tab-pane">
       <h2>Inventory</h2>
       <textarea id="input_inventory" placeholder="Free-form inventory notes or JSON-style list..."></textarea>
@@ -165,22 +201,29 @@
           <label>Unspent XP</label><input id="xp_unspent" type="number" readonly />
         </div>
       </div>
-      <h3>XP Log</h3>
-      <pre id="xp_log"></pre>
-      <h3>Add XP</h3>
-      <label>Amount</label><input id="xp_add_amount" type="number" />
-      <label>Reason</label><input id="xp_add_reason" />
-      <label>Session</label><input id="xp_add_session" />
-      <button id="xp_add_btn">Add XP</button>
-      <pre id="xp_status"></pre>
+      <div class="field">
+        <label>XP Log</label>
+        <textarea id="xp_log" readonly></textarea>
+      </div>
+      <div class="field">
+        <label>Add XP</label>
+        <input id="xp_add_amount" type="number" />
+        <input id="xp_add_note" placeholder="Reason" />
+        <button id="xp_add_btn">Add XP</button>
+      </div>
     </section>
 
     <section id="tab_rolls" class="tab-pane">
-      <h2>Rolls</h2>
-      <label>Dice Pool</label><input id="roll_pool" type="number" min="1" />
-      <label>Hunger Dice</label><input id="roll_hunger" type="number" min="0" max="5" />
+      <h2>Dice Roller</h2>
+      <div class="grid">
+        <div class="field">
+          <label>Dice Pool</label><input id="roll_pool" type="number" />
+        </div>
+        <div class="field">
+          <label>Hunger</label><input id="roll_hunger" type="number" min="0" max="5" />
+        </div>
+      </div>
       <button id="roll_btn">Roll</button>
-      <h3>Result</h3>
       <pre id="roll_result"></pre>
     </section>
 
