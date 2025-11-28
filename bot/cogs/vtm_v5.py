@@ -1,4 +1,4 @@
-import discord
+limport discord
 from discord.ext import commands
 
 from utils import get_guild_data
