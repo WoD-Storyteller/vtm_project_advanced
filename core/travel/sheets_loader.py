@@ -1,146 +1,199 @@
+# core/travel/sheets_loader.py
 from __future__ import annotations
 
 import json
 import os
-from typing import Dict, List
+from typing import Dict, List, Any
 
 import gspread
 from dotenv import load_dotenv
 
-from .haven_model import Haven
-from .haven_registry import HAVENS_JSON_PATH
-
+# Load environment variables so this module can be used from
+# bot commands, CLI, or the API server.
 load_dotenv()
 
-HAVENS_SHEET_ID = os.getenv("GOOGLE_HAVENS_SHEET_ID")
-SERVICE_KEY = os.getenv("GOOGLE_SERVICE_ACCOUNT")  # JSON string or path
+# Where the synced zones end up on disk.
+# ZoneRegistry reads from this path.
+ZONES_JSON_PATH = "data/zones.json"
+
+# Environment configuration:
+#   GOOGLE_SHEET_ID        – The spreadsheet ID for your world map / zones sheet
+#   GOOGLE_SERVICE_ACCOUNT – Either:
+#        * Absolute path to the service-account JSON, OR
+#        * The raw JSON of the service account (single-line string)
+SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
+SERVICE_KEY = os.getenv("GOOGLE_SERVICE_ACCOUNT")
 
 
-def _get_gspread_client():
+# ---------------------------------------------------------------------------
+# Google Sheets helpers
+# ---------------------------------------------------------------------------
+
+def _get_gspread_client() -> gspread.Client:
+    """
+    Build a gspread client from the GOOGLE_SERVICE_ACCOUNT environment value.
+
+    Supports two patterns:
+      1) GOOGLE_SERVICE_ACCOUNT=/path/to/key.json
+      2) GOOGLE_SERVICE_ACCOUNT='{"type": "service_account", ... }'
+    """
     if not SERVICE_KEY:
-        raise RuntimeError("GOOGLE_SERVICE_ACCOUNT is not set in .env")
-    key = SERVICE_KEY.strip()
-    if key.startswith("{"):
-        data = json.loads(key)
-        return gspread.service_account_from_dict(data)
-    return gspread.service_account(filename=key)
+        raise RuntimeError("GOOGLE_SERVICE_ACCOUNT is not set in environment.")
+
+    # If the value looks like a path and exists, treat as filename
+    if os.path.exists(SERVICE_KEY):
+        return gspread.service_account(filename=SERVICE_KEY)
+
+    # Otherwise assume it's JSON in the env var
+    try:
+        key_dict = json.loads(SERVICE_KEY)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            "GOOGLE_SERVICE_ACCOUNT is set but is neither a valid "
+            "file path nor valid JSON."
+        ) from exc
+
+    return gspread.service_account_from_dict(key_dict)
 
 
-def load_sheet_havens(sheet_id: str | None = None) -> Dict[str, Haven]:
+def _get_worksheet(client: gspread.Client, sheet_id: str) -> gspread.Worksheet:
     """
-    Loads havens from a Google Sheet.
+    Returns the primary worksheet for the zones data.
 
-    Expected columns (case-insensitive, best-effort):
+    Right now we just use the first worksheet in the spreadsheet.
+    If you later want to lock to a specific tab name, you can
+    change this to:
 
-      haven_id
-      name
-      owner_ids           (comma sep Discord IDs)
-      zone_key
+        sh = client.open_by_key(sheet_id)
+        return sh.worksheet("Zones")
 
-      lat
-      lng
-
-      security
-      luxury
-
-      feeding_domain
-      masquerade_buffer
-      warding_level
-      influence
-
-      rooms               (comma sep)
-      tags                (comma sep)
-
-      map_name
-      map_type
-      map_url
-
-    One row per haven *map* entry; multiple rows may share same haven_id.
     """
-    sheet_id = sheet_id or HAVENS_SHEET_ID
     if not sheet_id:
-        raise RuntimeError("GOOGLE_HAVENS_SHEET_ID is not set in .env")
+        raise RuntimeError("GOOGLE_SHEET_ID is not set in environment.")
+    sh = client.open_by_key(sheet_id)
+    # First worksheet = index 0
+    return sh.get_worksheet(0)
 
-    gc = _get_gspread_client()
-    sh = gc.open_by_key(sheet_id)
-    ws = sh.sheet1
-    rows = ws.get_all_records()
 
-    havens: Dict[str, Haven] = {}
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def load_sheet_zones(sheet_id: str | None = None) -> Dict[str, dict]:
+    """
+    Read all rows from the Google Sheet and convert them into the in-memory
+    `zones` structure expected by `ZoneRegistry`.
+
+    The sheet is expected to have (at minimum) the following column headers:
+
+      key                – unique string ID, e.g. 'canterbury_domain'
+      name               – display name
+      description        – text
+      tags               – comma-separated list of tags
+      encounter_table    – key into encounters.json (e.g. 'urban_camarilla')
+
+      risk_violence      – int
+      risk_masquerade    – int
+      risk_si            – int
+
+      region             – region / domain label
+      lat                – latitude (float)
+      lng                – longitude (float)
+      faction            – owning faction (string)
+      hunting_risk       – int
+      si_risk            – int
+      travel_difficulty  – int
+
+      map_name           – optional MyMaps / KML group name
+      map_layer          – optional layer name
+      map_label          – label for this zone on the map
+      map_url            – URL to the map or KML
+
+    Extra columns are ignored.
+    """
+    global SHEET_ID  # allow overriding via argument
+
+    effective_sheet_id = sheet_id or SHEET_ID
+    if not effective_sheet_id:
+        raise RuntimeError(
+            "No sheet_id provided and GOOGLE_SHEET_ID is not set. "
+            "Set GOOGLE_SHEET_ID in your environment or pass sheet_id explicitly."
+        )
+
+    client = _get_gspread_client()
+    ws = _get_worksheet(client, effective_sheet_id)
+
+    # gspread returns a list[dict] keyed by header row
+    rows: List[Dict[str, Any]] = ws.get_all_records()
+
+    zones: Dict[str, dict] = {}
 
     for row in rows:
-        raw_id = row.get("haven_id") or row.get("id")
-        if not raw_id:
+        # allow either "key" or "zone_key" as the header
+        key_raw = row.get("key") or row.get("zone_key") or ""
+        key = str(key_raw).strip()
+        if not key:
+            # Skip any blank lines in the sheet
             continue
 
-        haven_id = str(raw_id).strip()
-        if not haven_id:
-            continue
+        if key not in zones:
+            # First time seeing this zone: create the core record
+            tags_str = str(row.get("tags", "") or "")
+            tags = [t.strip() for t in tags_str.split(",") if t.strip()]
 
-        if haven_id not in havens:
-            owner_raw = row.get("owner_ids") or ""
-            owner_ids = [o.strip() for o in owner_raw.split(",") if o.strip()]
-
-            def _num(name, default=None):
-                v = row.get(name)
-                if v in ("", None):
-                    return default
-                try:
-                    return float(v)
-                except Exception:
-                    return default
-
-            lat = _num("lat")
-            lng = _num("lng")
-            security = int(row.get("security") or 1)
-            luxury = int(row.get("luxury") or 1)
-
-            domain = {
-                "feeding": int(row.get("feeding_domain") or 0),
-                "masquerade_buffer": int(row.get("masquerade_buffer") or 0),
-                "warding_level": int(row.get("warding_level") or 0),
-                "influence": int(row.get("influence") or 0),
+            base_risk = {
+                "violence": int(row.get("risk_violence", 1) or 1),
+                "masquerade": int(row.get("risk_masquerade", 1) or 1),
+                "si": int(row.get("risk_si", 1) or 1),
             }
 
-            rooms_raw = row.get("rooms") or ""
-            tags_raw = row.get("tags") or ""
-            rooms = [r.strip().lower() for r in rooms_raw.split(",") if r.strip()]
-            tags = [t.strip().lower() for t in tags_raw.split(",") if t.strip()]
+            zones[key] = {
+                "key": key,
+                "name": row.get("name", "") or key,
+                "description": row.get("description", ""),
+                "tags": tags,
+                "encounter_table": row.get("encounter_table", ""),
+                "base_risk": base_risk,
+                "region": row.get("region", ""),
+                "lat": float(row.get("lat") or 0.0),
+                "lng": float(row.get("lng") or 0.0),
+                "faction": row.get("faction", ""),
+                "hunting_risk": int(row.get("hunting_risk", 0) or 0),
+                "si_risk": int(row.get("si_risk", 0) or 0),
+                "travel_difficulty": int(row.get("travel_difficulty", 1) or 1),
+                # This will be populated by any map rows for this zone
+                "mymaps": [],
+            }
 
-            havens[haven_id] = Haven(
-                id=haven_id,
-                name=row.get("name", haven_id),
-                zone_key=(row.get("zone_key") or "").strip().lower(),
-                owner_ids=owner_ids,
-                lat=lat,
-                lng=lng,
-                security=security,
-                luxury=luxury,
-                domain=domain,
-                rooms=rooms,
-                tags=tags,
-                maps=[],
-            )
+        # Each row can optionally add a map entry for this zone.
+        map_entry = {
+            "map_name": row.get("map_name", ""),
+            "layer": row.get("map_layer", ""),
+            "label": row.get("map_label", ""),
+            "url": row.get("map_url", ""),
+        }
 
-        haven = havens[haven_id]
-        map_name = row.get("map_name") or ""
-        map_url = row.get("map_url") or ""
-        map_type = row.get("map_type") or "mymaps"
+        if map_entry["map_name"] or map_entry["url"]:
+            zones[key]["mymaps"].append(map_entry)
 
-        if map_name and map_url:
-            haven.maps.append(
-                {
-                    "map_name": map_name,
-                    "url": map_url,
-                    "type": map_type,
-                }
-            )
-
-    return havens
+    return zones
 
 
-def save_havens_file(havens: Dict[str, Haven], path: str = HAVENS_JSON_PATH):
-    data = [h.to_dict() for h in havens.values()]
+def save_zones_file(zones: Dict[str, dict], path: str = ZONES_JSON_PATH) -> None:
+    """
+    Writes zones.json to disk as a flat list[zone].
+
+    This is what `ZoneRegistry.load_from_json` expects.
+    """
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+        json.dump(list(zones.values()), f, indent=4, ensure_ascii=False)
+
+
+if __name__ == "__main__":
+    # Simple CLI usage:
+    #   python -m core.travel.sheets_loader
+    # to pull from the configured sheet and write data/zones.json
+    zones = load_sheet_zones()
+    save_zones_file(zones)
+    print(f"Synced {len(zones)} zones to {ZONES_JSON_PATH}")
