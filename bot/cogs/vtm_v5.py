@@ -1,4 +1,4 @@
-limport discord
+import discord
 from discord.ext import commands
 
 from utils import get_guild_data
@@ -525,4 +525,107 @@ class VtMV5Cog(commands.Cog):
             current = character_model.get_predator_type_name(player)
             if not current:
                 return await ctx.reply(
-                    "No predator type s
+                    "No predator type set. Use `!predator <name>`.\n"
+                    "Try `!predatorinfo alleycat` or `!predatorinfo bagger` for examples."
+                )
+            return await ctx.reply(f"Your predator type is **{current}**.")
+
+        pt = predator_types.set_player_predator_type(player, name)
+        if callable(getattr(self.bot, "save_data", None)):
+            self.bot.save_data()
+        await ctx.reply(f"Predator type set to **{pt['name']}**.")
+
+    @commands.command(name="predatorinfo")
+    async def predatorinfo(self, ctx, *, name: str):
+        """
+        Show details for a predator type.
+        """
+        pt = predator_types.get_predator_type(name)
+        if not pt:
+            names = ", ".join(p["name"] for p in predator_types.list_predator_types())
+            return await ctx.reply(f"Unknown predator type. Known examples:\n{names}")
+
+        desc_lines = [
+            f"**{pt['name']}**",
+            "",
+            pt["description"],
+            "",
+            f"**Feeding Style:** {pt['feeding_style']}",
+        ]
+        bonuses = pt.get("bonuses") or {}
+        if bonuses.get("skills"):
+            skills_str = ", ".join(f"{k}+{v}" for k, v in bonuses["skills"].items())
+            desc_lines.append("")
+            desc_lines.append(f"**Skill Bonuses:** {skills_str}")
+        if bonuses.get("specialties"):
+            desc_lines.append("")
+            desc_lines.append("**Suggested Specialties:**")
+            for s in bonuses["specialties"]:
+                desc_lines.append(f"• {s}")
+        if bonuses.get("discipline_dots"):
+            desc_lines.append("")
+            desc_lines.append(
+                "**Discipline Suggestions:** " + ", ".join(bonuses["discipline_dots"])
+            )
+        if pt.get("advantages"):
+            desc_lines.append("")
+            desc_lines.append("**Advantages:**")
+            for adv in pt["advantages"]:
+                desc_lines.append(f"• {adv}")
+        if pt.get("drawbacks"):
+            desc_lines.append("")
+            desc_lines.append("**Drawbacks:**")
+            for d in pt["drawbacks"]:
+                desc_lines.append(f"• {d}")
+
+        embed = discord.Embed(
+            title=f"Predator Type – {pt['name']}",
+            description="\n".join(desc_lines),
+            color=discord.Color.dark_red(),
+        )
+        await ctx.send(embed=embed)
+
+    @commands.command(name="feed")
+    async def feed(self, ctx, source: str, amount: int = 1):
+        """
+        Apply feeding using Predator rules.
+
+        source: human / animal / bagged / vampire
+        amount: approximate "intensity" (1–3, more for dramatic scenes)
+        """
+        guild_data, player = self._get_player(ctx)
+        if not player:
+            return await ctx.reply("You don't have a character sheet yet.")
+
+        src_norm = source.lower()
+        if src_norm not in ("human", "animal", "bagged", "vampire"):
+            return await ctx.reply("Source must be one of: human, animal, bagged, vampire.")
+
+        res = hunger.apply_feeding(player, src_norm, amount)
+        if callable(getattr(self.bot, "save_data", None)):
+            self.bot.save_data()
+
+        predator_name = res["predator_type"] or (
+            character_model.get_predator_type_name(player) or "None"
+        )
+        notes = "\n".join(res["notes"]) if res["notes"] else "—"
+
+        embed = discord.Embed(
+            title=f"Feeding – {player.get('name', ctx.author.display_name)}",
+            color=discord.Color.dark_red(),
+        )
+        embed.add_field(name="Source", value=src_norm, inline=True)
+        embed.add_field(name="Amount", value=str(res["amount"]), inline=True)
+        embed.add_field(name="Predator Type", value=predator_name, inline=True)
+        embed.add_field(
+            name="Hunger",
+            value=f"{res['old_hunger']} → {res['new_hunger']}",
+            inline=False,
+        )
+        embed.add_field(name="Notes", value=notes, inline=False)
+
+        await ctx.send(embed=embed)
+
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(VtMV5Cog(bot))
