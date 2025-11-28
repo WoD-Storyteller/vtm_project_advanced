@@ -15,43 +15,51 @@ async function autoLoginSession() {
     url.searchParams.set("mode", s.mode);
     url.searchParams.set("avatar", s.avatar);
     window.history.replaceState({}, "", url.toString());
+
     return s;
   } catch (e) {
-    console.error("Session error", e);
+    console.error("autoLoginSession error", e);
     return null;
   }
 }
 
-function setupUserBanner() {
+function getUserId() {
   const params = new URLSearchParams(window.location.search);
-  const userId = params.get("user_id");
-  const mode = params.get("mode") || "player";
-  const username = params.get("username");
-  const avatar = params.get("avatar");
+  return params.get("user_id");
+}
 
+function getUsername() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("username") || "Unknown";
+}
+
+function getMode() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("mode") || "player";
+}
+
+function getAvatar() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("avatar") || "";
+}
+
+function setupUserBanner() {
   const banner = document.getElementById("user_banner");
+  const username = getUsername();
+  const mode = getMode();
+  banner.textContent = `${username} – ${mode === "st" ? "Storyteller" : "Player"} Mode`;
+
+  const avatarUrl = getAvatar();
   const avatarImg = document.getElementById("avatar_img");
-  if (!banner || !userId) return;
-
-  const roleLabel = mode === "st" ? "Storyteller" : "Player";
-  let text = `Logged in as ${roleLabel} – ID ${userId}`;
-  if (username) {
-    text = `Logged in as ${roleLabel} – ${decodeURIComponent(username)} (ID ${userId})`;
-  }
-  banner.textContent = text;
-
-  if (avatar && avatarImg) {
-    avatarImg.src = decodeURIComponent(avatar);
+  if (avatarUrl) {
+    avatarImg.src = avatarUrl;
   }
 }
 
 function setupRoleSwitch() {
-  const params = new URLSearchParams(window.location.search);
-  const mode = params.get("mode") || "player";
   const switchDiv = document.getElementById("role_switch");
-  if (!switchDiv) return;
-
-  let link = "";
+  const mode = getMode();
+  let link;
   if (mode === "player") {
     link = `<a href="/auth/login?mode=st" class="role-switch-link">Switch to Storyteller View</a>`;
   } else {
@@ -75,12 +83,34 @@ function setupTabs() {
   });
 }
 
-// ------------- Helpers -------------
+// ------------- Portrait Upload -------------
 
-function getUserId() {
-  const params = new URLSearchParams(window.location.search);
-  return params.get("user_id");
+async function uploadPortrait() {
+  if (!currentUserId || !currentCharacterId) {
+    alert("No character selected.");
+    return;
+  }
+  const fileInput = document.getElementById("portrait_input");
+  if (!fileInput.files || !fileInput.files[0]) {
+    alert("Choose an image first.");
+    return;
+  }
+  const formData = new FormData();
+  formData.append("file", fileInput.files[0]);
+
+  const res = await fetch(`/player/${currentUserId}/characters/${currentCharacterId}/portrait`, {
+    method: "POST",
+    body: formData,
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    alert("Error uploading portrait");
+    return;
+  }
+  document.getElementById("portrait_img").src = data.url;
 }
+
+// ------------- Globals -------------
 
 let currentUserId = null;
 let currentCharacterId = null;
@@ -89,38 +119,29 @@ let currentCharacter = null;
 // ------------- Character List -------------
 
 async function loadCharacterList() {
-  currentUserId = getUserId();
-  if (!currentUserId) {
-    alert("No user_id found. Please log in via Discord.");
-    return;
-  }
-
+  if (!currentUserId) return;
   const res = await fetch(`/player/${currentUserId}/characters`);
   const data = await res.json();
-  const select = document.getElementById("character_select");
-  select.innerHTML = "";
-
   if (!data.ok) {
-    console.warn("No characters found yet.");
+    console.error("Error loading character list", data);
+    return;
   }
-
-  const chars = (data.characters || []);
-  chars.forEach(c => {
+  const select = document.getElementById("char_list");
+  select.innerHTML = "";
+  (data.characters || []).forEach(char => {
     const opt = document.createElement("option");
-    opt.value = c.id;
-    opt.textContent = `${c.name || "(Unnamed)"} [${c.clan || "?"}]`;
+    opt.value = char.id;
+    opt.textContent = char.name || `Character ${char.id}`;
     select.appendChild(opt);
   });
-
-  if (data.active) {
-    select.value = data.active;
-    await loadCharacter(data.active);
-  } else if (chars.length > 0) {
-    await loadCharacter(chars[0].id);
+  if ((data.characters || []).length > 0) {
+    currentCharacterId = data.characters[0].id;
+    select.value = currentCharacterId;
+    await loadCharacter(currentCharacterId);
   }
-
   select.addEventListener("change", async () => {
-    await loadCharacter(select.value);
+    currentCharacterId = select.value;
+    await loadCharacter(currentCharacterId);
   });
 }
 
@@ -155,13 +176,19 @@ async function createNewCharacter() {
     },
     skills: {},
     disciplines: [],
-    advantages: { backgrounds: [], merits: [], flaws: [] },
     health: { max: 3, superficial: 0, aggravated: 0 },
     willpower: { max: 3, superficial: 0, aggravated: 0 },
     hunger: 1,
+    humanity: 7,
+    stains: 0,
+    blood_potency: 1,
+    merits: [],
+    flaws: [],
+    convictions: [],
+    touchstones: [],
     xp: { total: 0, spent: 0, unspent: 0, log: [] },
-    inventory: [],
-    boons: [],
+    inventory_text: "",
+    boons_text: "",
     notes: ""
   };
   const res = await fetch(`/player/${currentUserId}/characters`, {
@@ -206,6 +233,8 @@ function buildSkillsGrid() {
 
 function fillCharacterForm() {
   const c = currentCharacter || {};
+
+  // Basics
   document.getElementById("input_name").value = c.name || "";
   document.getElementById("input_clan").value = c.clan || "";
   document.getElementById("input_gen").value = c.generation || "";
@@ -215,6 +244,7 @@ function fillCharacterForm() {
   document.getElementById("input_sire").value = c.sire || "";
   document.getElementById("input_ambitions").value = c.ambitions || "";
 
+  // Attributes
   const attrs = c.attributes || {};
   const attrIds = ["strength","dexterity","stamina","charisma","manipulation","composure","intelligence","wits","resolve"];
   attrIds.forEach(a => {
@@ -222,86 +252,207 @@ function fillCharacterForm() {
     if (el) el.value = attrs[a] || 0;
   });
 
+  // Skills
   const skills = c.skills || {};
-  SKILLS.forEach(s => {
-    const el = document.getElementById("skill_" + s);
-    if (el) el.value = skills[s] || 0;
+  SKILLS.forEach(skill => {
+    const el = document.getElementById("skill_" + skill);
+    if (el) el.value = skills[skill] || 0;
   });
 
-  const health = c.health || {};
+  // Disciplines
+  renderDisciplines(c.disciplines || []);
+
+  // Health / Willpower / Hunger / Humanity / Blood Potency
+  const health = c.health || { max: 3, superficial: 0, aggravated: 0 };
   document.getElementById("health_max").value = health.max || 0;
   document.getElementById("health_sup").value = health.superficial || 0;
   document.getElementById("health_agg").value = health.aggravated || 0;
 
-  const wp = c.willpower || {};
+  const wp = c.willpower || { max: 3, superficial: 0, aggravated: 0 };
   document.getElementById("wp_max").value = wp.max || 0;
   document.getElementById("wp_sup").value = wp.superficial || 0;
   document.getElementById("wp_agg").value = wp.aggravated || 0;
 
-  document.getElementById("hunger").value = c.hunger || 0;
+  document.getElementById("hunger").value = c.hunger != null ? c.hunger : 1;
+  const humanityInput = document.getElementById("humanity");
+  if (humanityInput) humanityInput.value = c.humanity != null ? c.humanity : 7;
+  const stainsInput = document.getElementById("stains");
+  if (stainsInput) stainsInput.value = c.stains != null ? c.stains : 0;
+  const bpInput = document.getElementById("blood_potency");
+  if (bpInput) bpInput.value = c.blood_potency != null ? c.blood_potency : 1;
 
-  document.getElementById("input_inventory").value = c.inventory_text || "";
-  document.getElementById("input_boons").value = c.boons_text || "";
-
-  const xp = c.xp || {};
+  // XP
+  const xp = c.xp || { total: 0, spent: 0, unspent: 0, log: [] };
   document.getElementById("xp_total").value = xp.total || 0;
   document.getElementById("xp_spent").value = xp.spent || 0;
   document.getElementById("xp_unspent").value = xp.unspent || 0;
-  document.getElementById("xp_log").textContent = JSON.stringify(xp.log || [], null, 2);
+  document.getElementById("xp_log").value = (xp.log || []).join("\n");
 
-  renderDisciplines(c.disciplines || []);
+  // Inventory / Boons
+  document.getElementById("input_inventory").value = c.inventory_text || "";
+  document.getElementById("input_boons").value = c.boons_text || "";
 
-  const portraitImg = document.getElementById("portrait_img");
-  if (c.portrait_url) {
-    portraitImg.src = c.portrait_url;
-  } else {
-    portraitImg.src = "";
+  // V5 narrative fields
+  const meritsArea = document.getElementById("merits_text");
+  const flawsArea = document.getElementById("flaws_text");
+  const convArea = document.getElementById("convictions_text");
+  const tsArea = document.getElementById("touchstones_text");
+
+  if (meritsArea) {
+    const merits = c.merits || [];
+    meritsArea.value = merits.map(m => {
+      const dots = m.dots != null ? m.dots : "";
+      const t = m.type || "";
+      const note = m.note || "";
+      return [m.name || "", dots, t, note].join(" | ");
+    }).join("\n");
+  }
+
+  if (flawsArea) {
+    const flaws = c.flaws || [];
+    flawsArea.value = flaws.map(f => {
+      const dots = f.dots != null ? f.dots : "";
+      const t = f.type || "";
+      const note = f.note || "";
+      return [f.name || "", dots, t, note].join(" | ");
+    }).join("\n");
+  }
+
+  if (convArea) {
+    const convs = c.convictions || [];
+    convArea.value = convs.map(cv => cv.text || "").join("\n");
+  }
+
+  if (tsArea) {
+    const tstones = c.touchstones || [];
+    tsArea.value = tstones.map(ts => {
+      const alive = ts.alive === false ? "dead" : "alive";
+      return [ts.name || "", ts.role || "", alive].join(" | ");
+    }).join("\n");
   }
 }
 
 function readCharacterForm() {
-  if (!currentCharacter) currentCharacter = {};
-  const c = currentCharacter;
-  c.name = document.getElementById("input_name").value;
-  c.clan = document.getElementById("input_clan").value;
-  c.generation = parseInt(document.getElementById("input_gen").value || "0", 10);
-  c.concept = document.getElementById("input_concept").value;
-  c.predator_type = document.getElementById("input_predator").value;
-  c.chronicle = document.getElementById("input_chronicle").value;
-  c.sire = document.getElementById("input_sire").value;
-  c.ambitions = document.getElementById("input_ambitions").value;
+  const c = currentCharacter || {};
 
-  const attrs = {};
+  // Basics
+  c.name = document.getElementById("input_name").value || "";
+  c.clan = document.getElementById("input_clan").value || "";
+  c.generation = parseInt(document.getElementById("input_gen").value || "0", 10) || 0;
+  c.concept = document.getElementById("input_concept").value || "";
+  c.predator_type = document.getElementById("input_predator").value || "";
+  c.chronicle = document.getElementById("input_chronicle").value || "";
+  c.sire = document.getElementById("input_sire").value || "";
+  c.ambitions = document.getElementById("input_ambitions").value || "";
+
+  // Attributes
   const attrIds = ["strength","dexterity","stamina","charisma","manipulation","composure","intelligence","wits","resolve"];
+  const attrs = {};
   attrIds.forEach(a => {
     const el = document.getElementById("attr_" + a);
-    attrs[a] = parseInt(el.value || "0", 10);
+    attrs[a] = parseInt(el.value || "0", 10) || 0;
   });
   c.attributes = attrs;
 
+  // Skills
   const skills = {};
-  SKILLS.forEach(s => {
-    const el = document.getElementById("skill_" + s);
-    skills[s] = parseInt(el.value || "0", 10);
+  SKILLS.forEach(skill => {
+    const el = document.getElementById("skill_" + skill);
+    skills[skill] = parseInt(el.value || "0", 10) || 0;
   });
   c.skills = skills;
 
+  // Health / Willpower / Hunger / Humanity / Blood Potency
   c.health = {
-    max: parseInt(document.getElementById("health_max").value || "0", 10),
-    superficial: parseInt(document.getElementById("health_sup").value || "0", 10),
-    aggravated: parseInt(document.getElementById("health_agg").value || "0", 10)
+    max: parseInt(document.getElementById("health_max").value || "0", 10) || 0,
+    superficial: parseInt(document.getElementById("health_sup").value || "0", 10) || 0,
+    aggravated: parseInt(document.getElementById("health_agg").value || "0", 10) || 0
   };
 
   c.willpower = {
-    max: parseInt(document.getElementById("wp_max").value || "0", 10),
-    superficial: parseInt(document.getElementById("wp_sup").value || "0", 10),
-    aggravated: parseInt(document.getElementById("wp_agg").value || "0", 10)
+    max: parseInt(document.getElementById("wp_max").value || "0", 10) || 0,
+    superficial: parseInt(document.getElementById("wp_sup").value || "0", 10) || 0,
+    aggravated: parseInt(document.getElementById("wp_agg").value || "0", 10) || 0
   };
 
-  c.hunger = parseInt(document.getElementById("hunger").value || "0", 10);
+  c.hunger = parseInt(document.getElementById("hunger").value || "0", 10) || 0;
 
-  c.inventory_text = document.getElementById("input_inventory").value;
-  c.boons_text = document.getElementById("input_boons").value;
+  const humanityInput = document.getElementById("humanity");
+  if (humanityInput) {
+    c.humanity = parseInt(humanityInput.value || "0", 10) || 0;
+  }
+  const stainsInput = document.getElementById("stains");
+  if (stainsInput) {
+    c.stains = parseInt(stainsInput.value || "0", 10) || 0;
+  }
+  const bpInput = document.getElementById("blood_potency");
+  if (bpInput) {
+    c.blood_potency = parseInt(bpInput.value || "0", 10) || 0;
+  }
+
+  // XP
+  const xp = c.xp || {};
+  xp.total = parseInt(document.getElementById("xp_total").value || "0", 10) || 0;
+  xp.spent = parseInt(document.getElementById("xp_spent").value || "0", 10) || 0;
+  xp.unspent = parseInt(document.getElementById("xp_unspent").value || "0", 10) || 0;
+  xp.log = (document.getElementById("xp_log").value || "")
+    .split("\n")
+    .map(l => l.trim())
+    .filter(l => l.length > 0);
+  c.xp = xp;
+
+  // Inventory / Boons
+  c.inventory_text = document.getElementById("input_inventory").value || "";
+  c.boons_text = document.getElementById("input_boons").value || "";
+
+  // V5 narrative fields from textareas
+  const meritsArea = document.getElementById("merits_text");
+  if (meritsArea) {
+    const meritsLines = meritsArea.value.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+    c.merits = meritsLines.map(line => {
+      const parts = line.split("|").map(p => p.trim());
+      return {
+        name: parts[0] || "",
+        dots: parts[1] ? (parseInt(parts[1], 10) || 0) : 0,
+        type: parts[2] || "general",
+        note: parts[3] || ""
+      };
+    });
+  }
+
+  const flawsArea = document.getElementById("flaws_text");
+  if (flawsArea) {
+    const flawsLines = flawsArea.value.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+    c.flaws = flawsLines.map(line => {
+      const parts = line.split("|").map(p => p.trim());
+      return {
+        name: parts[0] || "",
+        dots: parts[1] ? (parseInt(parts[1], 10) || 0) : 0,
+        type: parts[2] || "general",
+        note: parts[3] || ""
+      };
+    });
+  }
+
+  const convArea = document.getElementById("convictions_text");
+  if (convArea) {
+    const convLines = convArea.value.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+    c.convictions = convLines.map(text => ({ text }));
+  }
+
+  const tsArea = document.getElementById("touchstones_text");
+  if (tsArea) {
+    const tsLines = tsArea.value.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+    c.touchstones = tsLines.map(line => {
+      const parts = line.split("|").map(p => p.trim());
+      const status = (parts[2] || "alive").toLowerCase();
+      return {
+        name: parts[0] || "",
+        role: parts[1] || "",
+        alive: !(status === "dead" || status === "false" || status === "0")
+      };
+    });
+  }
 
   return c;
 }
@@ -314,6 +465,7 @@ function renderDisciplines(list) {
   list.forEach((d, idx) => {
     const wrap = document.createElement("div");
     wrap.className = "field";
+
     const nameInput = document.createElement("input");
     nameInput.value = d.name || "";
     nameInput.placeholder = "Discipline Name";
@@ -332,8 +484,8 @@ function renderDisciplines(list) {
     removeBtn.textContent = "Remove";
     removeBtn.type = "button";
     removeBtn.addEventListener("click", () => {
-      currentCharacter.disciplines.splice(idx, 1);
-      renderDisciplines(currentCharacter.disciplines);
+      list.splice(idx, 1);
+      renderDisciplines(list);
     });
 
     wrap.appendChild(nameInput);
@@ -341,18 +493,17 @@ function renderDisciplines(list) {
     wrap.appendChild(powersInput);
     wrap.appendChild(removeBtn);
     container.appendChild(wrap);
-
-    nameInput.addEventListener("input", () => { d.name = nameInput.value; });
-    levelInput.addEventListener("input", () => { d.level = parseInt(levelInput.value || "0", 10); });
-    powersInput.addEventListener("input", () => {
-      d.powers = powersInput.value.split("\n").map(s => s.trim()).filter(Boolean);
-    });
   });
 }
 
 function addDiscipline() {
-  if (!currentCharacter.disciplines) currentCharacter.disciplines = [];
-  currentCharacter.disciplines.push({ name: "", level: 0, powers: [] });
+  if (!currentCharacter) currentCharacter = {};
+  currentCharacter.disciplines = currentCharacter.disciplines || [];
+  currentCharacter.disciplines.push({
+    name: "",
+    level: 0,
+    powers: []
+  });
   renderDisciplines(currentCharacter.disciplines);
 }
 
@@ -381,19 +532,24 @@ async function addXp() {
     return;
   }
   const amount = parseInt(document.getElementById("xp_add_amount").value || "0", 10);
-  const reason = document.getElementById("xp_add_reason").value;
-  const session = document.getElementById("xp_add_session").value;
+  const note = document.getElementById("xp_add_note").value || "";
+  if (!amount) {
+    alert("Enter XP amount.");
+    return;
+  }
+  const payload = { amount, note };
   const res = await fetch(`/player/${currentUserId}/characters/${currentCharacterId}/xp`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amount, reason, session })
+    body: JSON.stringify(payload)
   });
   const data = await res.json();
-  document.getElementById("xp_status").textContent = JSON.stringify(data, null, 2);
-  const xp = data.xp || {};
-  document.getElementById("xp_total").value = xp.total || 0;
-  document.getElementById("xp_unspent").value = xp.unspent || 0;
-  document.getElementById("xp_log").textContent = JSON.stringify(xp.log || [], null, 2);
+  if (!data.ok) {
+    alert("Error adding XP");
+    return;
+  }
+  currentCharacter = data.character;
+  fillCharacterForm();
 }
 
 // ------------- Rolls -------------
@@ -414,49 +570,30 @@ async function doRoll() {
 // ------------- Requests -------------
 
 async function sendRequest() {
-  const subject = document.getElementById("req_subject").value;
-  const detail = document.getElementById("req_detail").value;
-  if (!subject || !detail) {
-    alert("Please fill subject and details.");
+  if (!currentUserId) {
+    alert("No user.");
     return;
   }
-  const res = await fetch(`/player/${currentUserId}/request`, {
+  const subject = document.getElementById("req_subject").value || "";
+  const detail = document.getElementById("req_detail").value || "";
+  const payload = { subject, detail, user_id: currentUserId };
+  const res = await fetch("/request", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ subject, detail })
+    body: JSON.stringify(payload)
   });
   const data = await res.json();
   document.getElementById("req_status").textContent = JSON.stringify(data, null, 2);
 }
 
-// ------------- Portrait Upload -------------
-
-async function uploadPortrait() {
-  if (!currentUserId || !currentCharacterId) {
-    alert("No character selected.");
-    return;
-  }
-  const fileInput = document.getElementById("portrait_input");
-  if (!fileInput.files.length) return alert("Choose an image file first.");
-
-  const formData = new FormData();
-  formData.append("file", fileInput.files[0]);
-
-  const res = await fetch(`/player/${currentUserId}/characters/${currentCharacterId}/portrait`, {
-    method: "POST",
-    body: formData
-  });
-  const data = await res.json();
-  document.getElementById("save_status").textContent = JSON.stringify(data, null, 2);
-  if (data.portrait_url) {
-    document.getElementById("portrait_img").src = data.portrait_url;
-  }
-}
-
 // ------------- Init -------------
 
-window.addEventListener("DOMContentLoaded", async () => {
-  await autoLoginSession();
+document.addEventListener("DOMContentLoaded", async () => {
+  const session = await autoLoginSession();
+  currentUserId = getUserId();
+  if (!currentUserId && session) {
+    currentUserId = session.sub;
+  }
   setupUserBanner();
   setupRoleSwitch();
   setupTabs();
@@ -469,5 +606,4 @@ window.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("xp_add_btn").addEventListener("click", addXp);
   document.getElementById("roll_btn").addEventListener("click", doRoll);
   document.getElementById("req_send_btn").addEventListener("click", sendRequest);
-  document.getElementById("upload_portrait_btn").addEventListener("click", uploadPortrait);
-});
+  document.getElementById("upload_portr
