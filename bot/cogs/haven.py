@@ -7,6 +7,7 @@ from core.havens.haven_engine import HavenEngine
 from core.travel.zones_loader import ZoneRegistry
 from core.havens.sheets_loader import load_sheet_havens, save_havens_file
 from core.vtmv5 import character_model
+from core.director.ai_director import AIDirector
 
 
 class HavenCog(commands.Cog):
@@ -19,9 +20,14 @@ class HavenCog(commands.Cog):
       !haven <zone> <name>        – create a haven by zone key/name
       !haven_info <id|name>       – show haven details
       !haven_primary <id|name>    – set your primary haven
+      !haven_rest [id|name]       – rest in your haven (WP/stains/hunger recovery)
+      !havenscene [id|name]       – generate an AI scene inside your haven
 
     ST:
       !sync_havens                – sync havens from Google Sheet
+      !haven_raid <id|name> [sev] – trigger a raid on a haven (Director + damage)
+      !haven_upgrade <id|name> <stat> <delta>
+                                  – tweak domain stats (security, luxury, feeding, etc.)
     """
 
     def __init__(self, bot: commands.Bot):
@@ -36,8 +42,6 @@ class HavenCog(commands.Cog):
     # Helpers
     # -------------------------------------------------
     def _format_haven(self, haven) -> str:
-        from core.travel.zones_loader import ZoneRegistry
-
         z_reg = self.zone_registry
         zone = z_reg.get(haven.zone_key) or z_reg.find(haven.zone_key) or None
 
@@ -65,6 +69,93 @@ class HavenCog(commands.Cog):
             lines.append(f"Tags: {', '.join(haven.tags)}")
 
         return "\n".join(lines)
+
+    async def _scene_embed_from_result(self, ctx: commands.Context, scene: dict, title_prefix: str = "Haven Scene"):
+        intro = scene.get("intro_text") or "No intro text."
+        npcs = scene.get("npcs") or []
+        encounter = scene.get("encounter")
+        quest_hook = scene.get("quest_hook") or ""
+        severity = scene.get("severity") or 1
+        severity_label = scene.get("severity_label") or "low"
+        director_update = scene.get("director_update") or {}
+
+        embed = discord.Embed(
+            title=f"{title_prefix} – Severity {severity} ({severity_label})",
+            description=intro,
+            color=discord.Color.dark_gold(),
+        )
+
+        if npcs:
+            npc_text = "\n".join(f"• {n}" for n in npcs)
+            embed.add_field(name="NPCs Present", value=npc_text, inline=False)
+
+        if encounter:
+            enc_name = encounter.get("name", "Encounter")
+            enc_desc = encounter.get("description", "")
+            embed.add_field(
+                name=f"Encounter – {enc_name}",
+                value=enc_desc or "—",
+                inline=False,
+            )
+
+        if quest_hook:
+            embed.add_field(
+                name="Quest Hook",
+                value=quest_hook,
+                inline=False,
+            )
+
+        city_state = director_update.get("city_state", director_update)
+        if city_state:
+            embed.add_field(
+                name="City Pressure (Director)",
+                value=(
+                    f"Masquerade: {city_state.get('masquerade_pressure', 0)}\n"
+                    f"Violence: {city_state.get('violence_pressure', 0)}\n"
+                    f"Occult: {city_state.get('occult_pressure', 0)}\n"
+                    f"SI: {city_state.get('si_pressure', 0)}\n"
+                    f"Politics: {city_state.get('political_pressure', 0)}\n"
+                    f"Global Threat: {city_state.get('global_threat', 1)}"
+                ),
+                inline=False,
+            )
+
+        return embed
+
+    def _resolve_player_and_haven(
+        self,
+        ctx: commands.Context,
+        token: str | None,
+    ):
+        """
+        Helper: get guild_data, player dict, and a Haven reference.
+        If token is None, falls back to primary haven, then first owned.
+        """
+        guild_data = get_guild_data(self.bot.data_store, ctx.guild.id)
+        players = guild_data.get("players") or {}
+        player = players.get(str(ctx.author.id))
+        if not player:
+            return guild_data, None, None
+
+        character_model.ensure_character_state(player)
+
+        # Resolve haven
+        haven = None
+        if token:
+            haven = self.engine.get_haven_by_id_or_name(token)
+
+        if not haven:
+            primary_id = character_model.get_primary_haven_id(player)
+            if primary_id:
+                haven = self.haven_registry.get(primary_id)
+
+        if not haven:
+            # fall back to any owned haven
+            owned = self.engine.get_player_havens(str(ctx.author.id))
+            if owned:
+                haven = owned[0]
+
+        return guild_data, player, haven
 
     # -------------------------------------------------
     # Player commands
@@ -130,7 +221,6 @@ class HavenCog(commands.Cog):
         # If they have no primary haven yet, set this as primary
         if not character_model.get_primary_haven_id(player):
             character_model.set_primary_haven_id(player, haven.id)
-            # Persist player data
             self.bot.save_data()
 
         description = self._format_haven(haven)
@@ -229,6 +319,94 @@ class HavenCog(commands.Cog):
 
         await ctx.reply(f"Primary haven set to **{haven.name}** (`{haven.id}`).")
 
+    @commands.command(name="haven_rest")
+    async def haven_rest(self, ctx: commands.Context, token: str | None = None):
+        """
+        Rest in a haven:
+          - Recovers superficial Willpower (luxury-based)
+          - May reduce a stain
+          - May reduce hunger if domain feeding is strong
+          - Applies shelter effects to Director
+        If no token is given, uses your primary haven (or first owned).
+        """
+        guild_data, player, haven = self._resolve_player_and_haven(ctx, token)
+
+        if not player:
+            return await ctx.reply("You do not have a character sheet.")
+        if not haven:
+            return await ctx.reply("You do not own any havens yet.")
+
+        result = self.engine.rest_in_haven(player, haven)
+        # Persist changes to player data
+        self.bot.save_data()
+
+        city = result.get("director", {})
+
+        desc_lines = [
+            f"You take time to rest in **{haven.name}**.",
+            "",
+            f"Willpower: {result['willpower_before']} → {result['willpower_after']} "
+            f"(superficial {result['superficial_before']} → {result['superficial_after']})",
+            f"Stains: {result['stains_before']} → {result['stains_after']}",
+            f"Hunger: {result['hunger_before']} → {result['hunger_after']}",
+        ]
+
+        embed = discord.Embed(
+            title="Rest in Haven",
+            description="\n".join(desc_lines),
+            color=discord.Color.green(),
+        )
+
+        embed.add_field(
+            name="City Pressure (Director)",
+            value=(
+                f"Masquerade: {city.get('masquerade_pressure', 0)}\n"
+                f"Violence: {city.get('violence_pressure', 0)}\n"
+                f"Occult: {city.get('occult_pressure', 0)}\n"
+                f"SI: {city.get('si_pressure', 0)}\n"
+                f"Politics: {city.get('political_pressure', 0)}\n"
+                f"Global Threat: {city.get('global_threat', 1)}"
+            ),
+            inline=False,
+        )
+
+        await ctx.send(embed=embed)
+
+    @commands.command(name="havenscene")
+    async def haven_scene(self, ctx: commands.Context, token: str | None = None):
+        """
+        Generate an AI-driven scene inside one of your havens.
+        If no token is provided, uses your primary haven (or first owned).
+        """
+        guild_data, player, haven = self._resolve_player_and_haven(ctx, token)
+
+        if not player:
+            return await ctx.reply("You do not have a character sheet.")
+        if not haven:
+            return await ctx.reply("You do not own any havens yet.")
+
+        zone = self.zone_registry.get(haven.zone_key) or self.zone_registry.find(haven.zone_key)
+        location_key = zone.key if zone else haven.zone_key
+
+        # Risk is generally lower in a secure haven; more chaotic if low security.
+        base_risk = 2
+        risk = max(1, base_risk - (haven.security // 2))
+
+        async with ctx.typing():
+            scene = await AIDirector.generate_scene(
+                model_text=self.bot.ai_model_text,
+                model_json=self.bot.ai_model_json,
+                guild_data=guild_data,
+                guild_id=ctx.guild.id,
+                location_key=location_key,
+                travelers=[player],
+                risk=risk,
+                tags=["haven", "safehouse"],
+            )
+
+        embed = await self._scene_embed_from_result(ctx, scene, title_prefix=f"Haven Scene – {haven.name}")
+        await ctx.send(embed=embed)
+
     # -------------------------------------------------
     # ST commands
     # -------------------------------------------------
@@ -247,6 +425,80 @@ class HavenCog(commands.Cog):
                 await ctx.send("✅ Havens synced from sheet and registry reloaded.")
             except Exception as e:
                 await ctx.send(f"❌ Haven sync failed: `{e}`")
+
+    @commands.command(name="haven_raid")
+    @commands.has_permissions(administrator=True)
+    async def haven_raid(self, ctx: commands.Context, token: str, severity: int = 3):
+        """
+        Storyteller: trigger a raid on a haven.
+        - Increases Director pressures
+        - Damages haven security / warding / influence
+        """
+        haven = self.engine.get_haven_by_id_or_name(token)
+        if not haven:
+            return await ctx.reply(f"No haven found for `{token}`.")
+
+        result = self.engine.apply_raid(haven, severity=severity)
+        h = result["haven"]
+        city = result["director"]
+
+        embed = discord.Embed(
+            title=f"Haven Raid – Severity {result['severity']}",
+            description=f"**{h['name']}** (`{h['id']}`) has been attacked.",
+            color=discord.Color.red(),
+        )
+
+        embed.add_field(
+            name="New Haven State",
+            value=(
+                f"Security: {h['security']}\n"
+                f"Warding: {h['domain'].get('warding_level', 0)}\n"
+                f"Influence: {h['domain'].get('influence', 0)}"
+            ),
+            inline=False,
+        )
+
+        embed.add_field(
+            name="City Pressure (Director)",
+            value=(
+                f"Masquerade: {city.get('masquerade_pressure', 0)}\n"
+                f"Violence: {city.get('violence_pressure', 0)}\n"
+                f"Occult: {city.get('occult_pressure', 0)}\n"
+                f"SI: {city.get('si_pressure', 0)}\n"
+                f"Politics: {city.get('political_pressure', 0)}\n"
+                f"Global Threat: {city.get('global_threat', 1)}"
+            ),
+            inline=False,
+        )
+
+        await ctx.send(embed=embed)
+
+    @commands.command(name="haven_upgrade")
+    @commands.has_permissions(administrator=True)
+    async def haven_upgrade(self, ctx: commands.Context, token: str, stat: str, delta: int):
+        """
+        Storyteller: tweak a haven's domain stats.
+
+        stat can be:
+          - security
+          - luxury
+          - feeding
+          - masquerade_buffer
+          - warding
+          - influence
+        """
+        haven = self.engine.get_haven_by_id_or_name(token)
+        if not haven:
+            return await ctx.reply(f"No haven found for `{token}`.")
+
+        new_haven = self.engine.upgrade_domain(haven, stat, delta)
+
+        embed = discord.Embed(
+            title="Haven Upgraded",
+            description=self._format_haven(new_haven),
+            color=discord.Color.blue(),
+        )
+        await ctx.send(embed=embed)
 
 
 async def setup(bot: commands.Bot):
