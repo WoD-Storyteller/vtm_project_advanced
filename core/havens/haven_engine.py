@@ -80,8 +80,6 @@ class HavenEngine:
         When a character retreats to their haven, we can gently nudge Director state:
           - security & warding lower Masquerade / SI pressure a bit
           - influence & masquerade_buffer lower city awareness slightly
-
-        This is intentionally mild and ST-friendly.
         """
         sec = haven.security
         ward = haven.domain.get("warding_level", 0)
