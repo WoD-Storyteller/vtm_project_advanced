@@ -11,51 +11,51 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 let zoneLayerGroup = L.layerGroup().addTo(map);
 let playerLayerGroup = L.layerGroup().addTo(map);
 let huntingHeatLayer = null;
+let siHeatLayer = null;
 
 let zonesData = [];
 let playersData = [];
+let directorState = null;
 
-// --- HELPERS ---
+// --- UTILS ---
 
-function factionColor(f) {
-  if (!f) return "#7f8c8d";
-  f = f.toLowerCase();
-  if (f.includes("camarilla")) return "#2980b9";
-  if (f.includes("anarch")) return "#e67e22";
-  if (f.includes("sabbat")) return "#c0392b";
-  if (f.includes("ministry")) return "#8e44ad";
-  if (f.includes("hecata")) return "#16a085";
-  if (f.includes("thin")) return "#f1c40f";
-  if (f.includes("si") || f.includes("inquisition") || f.includes("pentex"))
-    return "#e74c3c";
-  return "#7f8c8d";
+function factionColor(faction) {
+  if (!faction) return "#888";
+  const f = faction.toLowerCase();
+  if (f.includes("camarilla")) return "#4a90e2";
+  if (f.includes("anarch")) return "#e94e77";
+  if (f.includes("sabbat")) return "#900c3f";
+  if (f.includes("si") || f.includes("second inquisition") || f.includes("pentex"))
+    return "#ffcc00";
+  return "#aaaaaa";
 }
 
-function passesFactionFilter(z) {
-  const f = (z.faction || "").toLowerCase();
-  const tags = (z.tags || []).map((t) => t.toLowerCase());
+function passesFactionFilter(faction) {
+  const f = (faction || "other").toLowerCase();
+  if (f.includes("camarilla") && !document.getElementById("filter_camarilla").checked)
+    return false;
+  if (f.includes("anarch") && !document.getElementById("filter_anarch").checked)
+    return false;
+  if (f.includes("sabbat") && !document.getElementById("filter_sabbat").checked)
+    return false;
+  if (
+    (f.includes("si") || f.includes("second inquisition") || f.includes("pentex")) &&
+    !document.getElementById("filter_si").checked
+  )
+    return false;
 
-  const camOn = document.getElementById("filter_camarilla").checked;
-  const anaOn = document.getElementById("filter_anarch").checked;
-  const sabOn = document.getElementById("filter_sabbat").checked;
-  const siOn = document.getElementById("filter_si").checked;
-  const othOn = document.getElementById("filter_other").checked;
-
-  const isCam = f.includes("camarilla") || tags.includes("camarilla");
-  const isAn = f.includes("anarch") || tags.includes("anarch");
-  const isSab = f.includes("sabbat") || tags.includes("sabbat");
-  const isSi =
-    f.includes("si") ||
-    f.includes("inquisition") ||
-    f.includes("pentex") ||
-    tags.includes("si") ||
-    tags.includes("second_inquisition");
-
-  if (isCam && !camOn) return false;
-  if (isAn && !anaOn) return false;
-  if (isSab && !sabOn) return false;
-  if (isSi && !siOn) return false;
-  if (!isCam && !isAn && !isSab && !isSi && !othOn) return false;
+  if (
+    !(
+      f.includes("camarilla") ||
+      f.includes("anarch") ||
+      f.includes("sabbat") ||
+      f.includes("si") ||
+      f.includes("second inquisition") ||
+      f.includes("pentex")
+    )
+  ) {
+    if (!document.getElementById("filter_other").checked) return false;
+  }
 
   return true;
 }
@@ -67,9 +67,10 @@ function renderZones() {
 
   zonesData.forEach((z) => {
     if (!z.lat || !z.lng) return;
-    if (!passesFactionFilter(z)) return;
+    if (!passesFactionFilter(z.faction)) return;
 
     const color = factionColor(z.faction);
+
     const marker = L.circleMarker([z.lat, z.lng], {
       radius: 6,
       color: color,
@@ -99,16 +100,22 @@ function renderPlayers() {
 
   playersData.forEach((p) => {
     if (!p.lat || !p.lng) return;
+    if (!passesFactionFilter(p.faction)) return;
 
-    const marker = L.marker([p.lat, p.lng], {
-      title: p.name,
+    const color = factionColor(p.faction);
+
+    const marker = L.circleMarker([p.lat, p.lng], {
+      radius: 5,
+      color: color,
+      fillColor: color,
+      fillOpacity: 0.9,
     });
 
     marker.bindPopup(
       `<strong>${p.name}</strong><br/>
        Clan: ${p.clan || "Unknown"}<br/>
        Faction: ${p.faction || "Unknown"}<br/>
-       Zone: ${p.zone_name}`
+       Zone: ${p.zone_name || "Unknown"}`
     );
 
     playerLayerGroup.addLayer(marker);
@@ -137,6 +144,44 @@ function renderHuntingHeat() {
   }
 }
 
+function renderSiHeat() {
+  if (siHeatLayer) {
+    map.removeLayer(siHeatLayer);
+    siHeatLayer = null;
+  }
+
+  const toggle = document.getElementById("toggle_si_heat");
+  if (!toggle || !toggle.checked) return;
+
+  const points = [];
+  zonesData.forEach((z) => {
+    if (!z.lat || !z.lng) return;
+    if (z.si_risk && z.si_risk > 0) {
+      // Base intensity from zone si_risk (1–5)
+      let baseIntensity = Math.min(1, z.si_risk / 5);
+
+      // Optionally scale by global Second Inquisition pressure from Director state
+      let globalMultiplier = 1.0;
+      if (
+        directorState &&
+        directorState.themes &&
+        typeof directorState.themes.second_inquisition === "number"
+      ) {
+        const siTheme = directorState.themes.second_inquisition;
+        // Rough scaling: every 20 points of SI theme adds +0.2 intensity (capped at +1)
+        globalMultiplier += Math.min(1.0, siTheme / 20.0);
+      }
+
+      const intensity = Math.min(1, baseIntensity * globalMultiplier);
+      points.push([z.lat, z.lng, intensity]);
+    }
+  });
+
+  if (points.length > 0) {
+    siHeatLayer = L.heatLayer(points, { radius: 30, blur: 22 }).addTo(map);
+  }
+}
+
 // --- DATA LOADING ---
 
 async function loadZones() {
@@ -145,6 +190,7 @@ async function loadZones() {
     zonesData = await res.json();
     renderZones();
     renderHuntingHeat();
+    renderSiHeat();
   } catch (err) {
     console.error("Failed to load zones:", err);
   }
@@ -164,8 +210,11 @@ async function loadDirectorState() {
   try {
     const res = await fetch("/api/map/state");
     const state = await res.json();
-    // You can use this later to display global threat level etc.
-    console.log("Director state:", state);
+    directorState = state || null;
+    // You can also display this in a UI widget later.
+    console.log("Director state:", directorState);
+    // Refresh SI heat layer in case global SI pressure changed
+    renderSiHeat();
   } catch (err) {
     console.error("Failed to load director state:", err);
   }
@@ -190,6 +239,9 @@ document.getElementById("filter_other").addEventListener("change", () => {
 });
 document.getElementById("toggle_hunting").addEventListener("change", () => {
   renderHuntingHeat();
+});
+document.getElementById("toggle_si_heat").addEventListener("change", () => {
+  renderSiHeat();
 });
 document.getElementById("toggle_players").addEventListener("change", () => {
   renderPlayers();
