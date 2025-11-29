@@ -1,33 +1,21 @@
-# api/auth/routes.py
-
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
 
-router = APIRouter()
+router = APIRouter(prefix="/auth")
 
-
-# ========== MODELS ==========
-
-class LoginRequest(BaseModel):
+class LoginForm(BaseModel):
     username: str
     password: str
 
+@router.post("/login")
+async def login(req: Request, form: LoginForm):
+    # Replace with real DB lookup later
+    if form.username == "admin" and form.password == "admin":
+        req.session["user"] = form.username
+        return {"ok": True}
+    raise HTTPException(status_code=401, detail="Invalid credentials")
 
-class LoginResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-
-
-# ========== ROUTES ==========
-
-@router.post("/login", response_model=LoginResponse)
-async def login(payload: LoginRequest):
-    # TODO: Replace with DB lookup or JWT auth
-    if payload.username != "admin" or payload.password != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-        )
-
-    fake_token = "example.jwt.token"
-    return LoginResponse(access_token=fake_token)
+@router.post("/logout")
+async def logout(req: Request):
+    req.session.clear()
+    return {"ok": True}
