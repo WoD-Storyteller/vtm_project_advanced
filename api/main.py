@@ -6,8 +6,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 
-from auth_routes import router as auth_router
-from auth.session import add_session_middleware
+from api.auth.routes import router as auth_router
+from api.auth.session import add_session_middleware
 
 from api.map_routes import router as map_router
 from core.travel.zones_loader import ZoneRegistry
