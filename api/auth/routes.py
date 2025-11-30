@@ -13,7 +13,7 @@ from pydantic import BaseModel
 router = APIRouter()
 
 # ------------------------------------------------------------
-# Simple admin API login (kept for tools / future use)
+# Simple admin API login (optional, kept for tools)
 # ------------------------------------------------------------
 
 class LoginRequest(BaseModel):
@@ -28,10 +28,9 @@ class LoginResponse(BaseModel):
 
 @router.post("/auth/login", response_model=LoginResponse)
 async def login(payload: LoginRequest):
-    """Very basic username/password login (admin/admin by default).
-
-    This is mainly here so you still have a non-Discord way to talk
-    to the API if you need it later.
+    """
+    Very basic username/password login (admin/admin by default).
+    Not used by the dashboard, but handy for tools.
     """
     if payload.username != "admin" or payload.password != "admin":
         raise HTTPException(
@@ -60,25 +59,21 @@ def _require_discord_config():
     if not DISCORD_CLIENT_ID or not DISCORD_CLIENT_SECRET:
         raise HTTPException(
             status_code=500,
-            detail=(
-                "Discord OAuth not configured on server "
-                "(missing DISCORD_CLIENT_ID / SECRET)."
-            ),
+            detail="Discord OAuth not configured on server "
+                   "(missing DISCORD_CLIENT_ID / DISCORD_CLIENT_SECRET).",
         )
 
 
 def _make_state(request: Request) -> str:
-    state = "".join(
-        secrets.choice(string.ascii_letters + string.digits) for _ in range(32)
-    )
+    state = "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
     request.session["oauth_state"] = state
     return state
 
 
 @router.get("/login")
 async def login_entry(request: Request):
-    """Entry point used by /login on the domain.
-
+    """
+    Entry point used by /login on the domain.
     Immediately hands off to the Discord OAuth flow.
     """
     return await discord_login(request)
@@ -118,7 +113,7 @@ async def discord_callback(
     if not saved_state or state != saved_state:
         raise HTTPException(status_code=400, detail="Invalid OAuth state")
 
-    # Exchange the code for tokens
+    # Exchange code for token
     token_data = {
         "client_id": DISCORD_CLIENT_ID,
         "client_secret": DISCORD_CLIENT_SECRET,
@@ -134,16 +129,12 @@ async def discord_callback(
         headers=headers,
     )
     if token_resp.status_code != 200:
-        raise HTTPException(
-            status_code=400, detail="Failed to exchange code with Discord"
-        )
+        raise HTTPException(status_code=400, detail="Failed to exchange code with Discord")
 
     tokens = token_resp.json()
     access_token = tokens.get("access_token")
     if not access_token:
-        raise HTTPException(
-            status_code=400, detail="No access_token returned by Discord"
-        )
+        raise HTTPException(status_code=400, detail="No access_token returned by Discord")
 
     # Fetch user profile
     user_resp = requests.get(
@@ -151,20 +142,16 @@ async def discord_callback(
         headers={"Authorization": f"Bearer {access_token}"},
     )
     if user_resp.status_code != 200:
-        raise HTTPException(
-            status_code=400, detail="Failed to fetch user profile from Discord"
-        )
+        raise HTTPException(status_code=400, detail="Failed to fetch user profile from Discord")
     user = user_resp.json()
 
     avatar_hash = user.get("avatar")
     if avatar_hash:
-        avatar_url = (
-            f"https://cdn.discordapp.com/avatars/{user['id']}/{avatar_hash}.png"
-        )
+        avatar_url = f"https://cdn.discordapp.com/avatars/{user['id']}/{avatar_hash}.png"
     else:
         avatar_url = ""
 
-    # Store a compact session object for the dashboard JS
+    # Store data for dashboard JS
     request.session["user"] = {
         "sub": user["id"],
         "username": user.get("username"),
@@ -173,19 +160,19 @@ async def discord_callback(
     }
     request.session.pop("oauth_state", None)
 
-    # Send them to the dashboard – player sheet by default
+    # Kick them to the dashboard
     return RedirectResponse(url="/dashboard/player.html")
 
 
 # ------------------------------------------------------------
-# Session introspection for the dashboard JS
+# Session introspection for dashboard JS
 # ------------------------------------------------------------
 
 @router.get("/auth/session")
 async def get_session(request: Request):
-    """Return the current logged-in Discord user for the dashboard.
-
-    This is what /dashboard/js/app.js and /dashboard/js/player.js call.
+    """
+    Return the current logged-in Discord user.
+    /dashboard/js/app.js and /dashboard/js/player.js call this.
     """
     user = request.session.get("user")
     if not user:
