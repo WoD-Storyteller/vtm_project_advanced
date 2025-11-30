@@ -14,65 +14,58 @@ from core.travel.zones_loader import ZoneRegistry
 from utils import load_data_from_file, save_data
 
 # -----------------------------------------------------
-# LOGGING / ENV
+# App / config
 # -----------------------------------------------------
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-# Path to your persistent guild/world data
-DATA_PATH = os.getenv("DATA_PATH", "data/guild_data.json")
+logger = logging.getLogger("vtm_api")
+logging.basicConfig(level=logging.INFO)
 
-# Default guild ID used by the dashboard / map API
+DATA_PATH = os.getenv("DATA_PATH", "vtm_data.json")
 DEFAULT_GUILD_ID = os.getenv("DEFAULT_GUILD_ID")
-
-
-# -----------------------------------------------------
-# FASTAPI APP
-# -----------------------------------------------------
 
 app = FastAPI(title="Garden of Ashes API")
 
-# Session middleware for auth (your existing system)
-add_session_middleware(app, secret_key=os.getenv("SECRET_KEY", "change-me"))
+# Session middleware (needed for Discord OAuth + dashboard)
+SECRET_KEY = os.getenv("SECRET_KEY", "change-me")
+add_session_middleware(app, secret_key=SECRET_KEY)
 
-# Templates and static files (for dashboard + map)
+# Static dashboard files (player / ST front-end)
+app.mount(
+    "/dashboard",
+    StaticFiles(directory="dashboard", html=True),
+    name="dashboard",
+)
+
 templates = Jinja2Templates(directory="templates")
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 # -----------------------------------------------------
-# APP STATE INITIALISATION
+# Startup / shutdown
 # -----------------------------------------------------
 
 @app.on_event("startup")
 async def startup_event():
-    """
-    Load persistent data and zone registry into app.state for use by routes.
-    """
-    # Load data store
-    try:
-        data_store = load_data_from_file(DATA_PATH)
-        logger.info(f"Loaded data store from {DATA_PATH}")
-    except FileNotFoundError:
-        logger.warning(f"No data file at {DATA_PATH}, starting with empty store.")
-        data_store = {"guilds": {}}
+    global DEFAULT_GUILD_ID
 
+    # Load main data store
+    data_store = load_data_from_file(DATA_PATH)
     app.state.data_store = data_store
 
-    # Determine default guild id
-    global DEFAULT_GUILD_ID
-    if DEFAULT_GUILD_ID is None or DEFAULT_GUILD_ID == "":
-        # Try to infer from data_store
+    # Try to infer default guild if not configured
+    if not DEFAULT_GUILD_ID:
         guilds = data_store.get("guilds", {})
         if guilds:
             DEFAULT_GUILD_ID = str(next(iter(guilds.keys())))
-            logger.info(f"Inferred DEFAULT_GUILD_ID={DEFAULT_GUILD_ID} from data store.")
+            logger.info(
+                "Inferred DEFAULT_GUILD_ID=%s from data store.", DEFAULT_GUILD_ID
+            )
         else:
             DEFAULT_GUILD_ID = "0"
-            logger.warning("DEFAULT_GUILD_ID not set and no guilds found; using '0'.")
+            logger.warning(
+                "DEFAULT_GUILD_ID not set and no guilds found; using '0'."
+            )
 
     app.state.default_guild_id = DEFAULT_GUILD_ID
 
@@ -90,25 +83,27 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """
-    Persist any changes back to disk when the API shuts down.
-    """
+    """Persist any changes back to disk when the API shuts down."""
     data_store = getattr(app.state, "data_store", None)
     if data_store is not None:
         save_data(DATA_PATH, data_store)
-        logger.info(f"Saved data store to {DATA_PATH}")
+        logger.info("Saved data store to %s", DATA_PATH)
 
 
 # -----------------------------------------------------
-# ROUTES
+# Routers
 # -----------------------------------------------------
 
-# Auth routes (existing)
+# Discord / auth endpoints + /auth/session
 app.include_router(auth_router)
 
 # Map API routes (zones, players, director state)
 app.include_router(map_router)
 
+
+# -----------------------------------------------------
+# Basic views
+# -----------------------------------------------------
 
 @app.get("/")
 async def root():
@@ -117,7 +112,5 @@ async def root():
 
 @app.get("/map")
 async def map_view(request: Request):
-    """
-    World map viewer – uses templates/map_view.html + static/map/map.js
-    """
+    """World map viewer – uses templates/map_view.html + static/map/map.js"""
     return templates.TemplateResponse("map_view.html", {"request": request})
