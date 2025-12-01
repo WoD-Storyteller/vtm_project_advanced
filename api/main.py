@@ -8,7 +8,6 @@ from dotenv import load_dotenv
 
 from api.auth.routes import router as auth_router
 from api.auth.session import add_session_middleware
-
 from api.map_routes import router as map_router
 from core.travel.zones_loader import ZoneRegistry
 from utils import load_data_from_file, save_data
@@ -27,11 +26,11 @@ DEFAULT_GUILD_ID = os.getenv("DEFAULT_GUILD_ID")
 
 app = FastAPI(title="Garden of Ashes API")
 
-# Session middleware (needed for Discord OAuth + dashboard)
+# Session middleware (needed for Discord OAuth + /auth/session)
 SECRET_KEY = os.getenv("SECRET_KEY", "change-me")
 add_session_middleware(app, secret_key=SECRET_KEY)
 
-# Static dashboard files (player / ST front-end)
+# Static dashboard files
 app.mount(
     "/dashboard",
     StaticFiles(directory="dashboard", html=True),
@@ -58,14 +57,10 @@ async def startup_event():
         guilds = data_store.get("guilds", {})
         if guilds:
             DEFAULT_GUILD_ID = str(next(iter(guilds.keys())))
-            logger.info(
-                "Inferred DEFAULT_GUILD_ID=%s from data store.", DEFAULT_GUILD_ID
-            )
+            logger.info("Inferred DEFAULT_GUILD_ID=%s from data store.", DEFAULT_GUILD_ID)
         else:
             DEFAULT_GUILD_ID = "0"
-            logger.warning(
-                "DEFAULT_GUILD_ID not set and no guilds found; using '0'."
-            )
+            logger.warning("DEFAULT_GUILD_ID not set and no guilds found; using '0'.")
 
     app.state.default_guild_id = DEFAULT_GUILD_ID
 
@@ -78,7 +73,7 @@ async def startup_event():
         logger.warning("No data/zones.json found. Run your zones sync command first.")
     app.state.zone_registry = zone_registry
 
-    logger.info("Startup initialisation complete.")
+    logger.info("Startup initialization complete.")
 
 
 @app.on_event("shutdown")
@@ -97,7 +92,7 @@ async def shutdown_event():
 # Discord / auth endpoints + /auth/session
 app.include_router(auth_router)
 
-# Map API routes (zones, players, director state)
+# Map API routes (zones, etc.)
 app.include_router(map_router)
 
 
