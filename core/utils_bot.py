@@ -1,33 +1,24 @@
-import json import os from pathlib import 
-Path
-# --------------------------------- 
-# BOT-SIDE DATA MANAGEMENT 
-# ---------------------------------
-def load_data_from_file(path: str): 
-    """Loads the main VTM data-store used 
-    by the Discord bot.""" if not 
-    os.path.exists(path):
-        return {"guilds": {}} with 
-    open(path, "r", encoding="utf-8") as 
-    f:
-        return json.load(f) def 
-save_data(path: str, data: dict):
-    """Writes the bot data-store.""" 
-    os.makedirs(os.path.dirname(path), 
-    exist_ok=True) with open(path, "w", 
-    encoding="utf-8") as f:
+import json
+import os
+
+BOT_DATA_PATH = os.getenv("BOT_DATA_PATH", "bot_data.json")
+
+def load_bot_data(path: str = BOT_DATA_PATH):
+    if not os.path.exists(path):
+        return {"guilds": {}, "characters": {}, "items": {}}
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_bot_data(path: str, data: dict):
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
-# --------------------------------- 
-# BOT-SPECIFIC HELPERS 
-# ---------------------------------
-def get_guild_data(data_store: dict, 
-guild_id: int | str):
-    """Return or create guild block for 
-    the Discord bot.""" gid = 
-    str(guild_id) if "guilds" not in 
-    data_store:
-        data_store["guilds"] = {} if gid 
-    not in data_store["guilds"]:
-        data_store["guilds"][gid] = 
-        {"players": {}, "state": {}}
-    return data_store["guilds"][gid]
+    os.replace(tmp, path)
+
+def ensure_player(store: dict, guild_id: str, user_id: str):
+    store.setdefault("guilds", {})
+    store["guilds"].setdefault(guild_id, {"players": {}})
+    g = store["guilds"][guild_id]
+    if user_id not in g["players"]:
+        g["players"][user_id] = {"character": {}, "state": {}}
+    return g["players"][user_id]

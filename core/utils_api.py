@@ -1,30 +1,23 @@
-import json import os
-# --------------------------------- 
-# API-SIDE DATA MANAGEMENT 
-# ---------------------------------
-def load_json(path: str, default=None): if 
-    not os.path.exists(path):
-        return default if default is not 
-        None else {}
-    with open(path, "r", encoding="utf-8") 
-    as f:
-        return json.load(f) def 
-save_json(path: str, data: dict):
-    os.makedirs(os.path.dirname(path), 
-    exist_ok=True) with open(path, "w", 
-    encoding="utf-8") as f:
+import json
+import os
+
+DATA_FILE = os.getenv("DATA_PATH", "vtm_data.json")
+
+def load_data_from_file(path: str = DATA_FILE):
+    """Load API-side persistent data store."""
+    if not os.path.exists(path):
+        return {"guilds": {}, "players": {}, "director_state": {}}
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_data(path: str, data: dict):
+    """Atomic save for API store."""
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
-# --------------------------------- 
-# API-SAFE GUILD ACCESS 
-# ---------------------------------
-def get_guild_data_api(data_store: dict, 
-guild_id: int | str):
-    """ API-safe version: - No Discord 
-    structures - No imports from bot 
-    components """ gid = str(guild_id) if 
-    "guilds" not in data_store:
-        data_store["guilds"] = {} if gid 
-    not in data_store["guilds"]:
-        data_store["guilds"][gid] = 
-        {"players": {}, "state": {}}
-    return data_store["guilds"][gid]
+    os.replace(tmp, path)
+
+def get_guild_data(store: dict, guild_id: str):
+    store.setdefault("guilds", {})
+    store["guilds"].setdefault(guild_id, {"players": {}, "director_state": {}})
+    return store["guilds"][guild_id]
