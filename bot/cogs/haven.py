@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 
-from utils import get_guild_data
+from core.utils_bot import get_guild_data, load_data_from_file, save_data
 from core.havens.haven_registry import HavenRegistry
 from core.havens.haven_engine import HavenEngine
 from core.travel.zones_loader import ZoneRegistry

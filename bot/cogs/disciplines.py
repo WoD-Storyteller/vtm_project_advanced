@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 
-from core.utils import get_guild_data
+from core.utils_bot import get_guild_data, load_data_from_file, save_data
 from core.disciplines.loader import (
     load_disciplines,
     get_discipline,

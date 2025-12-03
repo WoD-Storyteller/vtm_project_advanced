@@ -3,7 +3,7 @@ from discord.ext import commands
 import traceback
 
 from core.director.ai_director import AIDirector
-from utils import get_guild_data
+from core.utils_bot import get_guild_data, load_data_from_file, save_data
 
 
 class StorytellerCog(commands.Cog):

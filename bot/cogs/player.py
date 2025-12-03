@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from core.utils import get_guild_data
+from core.utils_bot import get_guild_data, load_data_from_file, save_data
 from core.vampires.hunting import predator_hunt, simple_feed
 from core.vampires.scenes import generate_scene_description
 from core.hunters.travel import travel_to

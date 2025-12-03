@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 
-from utils import get_guild_data
+from core.utils_bot import get_guild_data, load_data_from_file, save_data
 from core.combat.combat_manager import CombatManager
 from core.combat.combatant_factory import CombatantFactory
 from core.combat.frenzy_system import FrenzySystem

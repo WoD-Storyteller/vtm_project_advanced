@@ -4,7 +4,7 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
-from utils import get_guild_data
+from core.utils_bot import get_guild_data, load_data_from_file, save_data
 from core.travel.zones_loader import ZoneRegistry
 from core.travel.travel_engine import TravelEngine
 from core.travel.sheets_loader import load_sheet_zones, save_zones_file

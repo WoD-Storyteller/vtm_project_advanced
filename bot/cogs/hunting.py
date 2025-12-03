@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 
-from utils import get_guild_data, generate_hunt_victim
+from core.utils_bot import get_guild_data, load_data_from_file, save_data
 from core.vtmv5.hunting_engine import HuntingEngine
 from core.vtmv5 import character_model
 from core.travel.zones_loader import ZoneRegistry
