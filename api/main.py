@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 
+from api.alerts_routes import router as alerts_router
 from api.auth.routes import router as auth_router
 from api.auth.session import add_session_middleware
 from api.map_routes import router as map_router
@@ -94,7 +95,8 @@ app.include_router(auth_router)
 
 # Map API routes (zones, etc.)
 app.include_router(map_router)
-
+# Dashboard Alerts router
+app.include_router(alerts_router)
 
 # -----------------------------------------------------
 # Basic views
