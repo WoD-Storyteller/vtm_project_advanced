@@ -1,113 +1,51 @@
+# api/main.py
 import logging
 import os
 
-from fastapi import FastAPI, Request
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from api.alerts_routes import router as alerts_router
+from api.alert_routes import router as alerts_router
 from api.auth.routes import router as auth_router
 from api.auth.session import add_session_middleware
-from api.map_routes import router as map_router
-from core.travel.zones_loader import ZoneRegistry
-from utils import load_data_from_file, save_data
+from api.config import settings
 
-# -----------------------------------------------------
-# App / config
-# -----------------------------------------------------
-
-load_dotenv()
-
-logger = logging.getLogger("vtm_api")
+logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-DATA_PATH = os.getenv("DATA_PATH", "vtm_data.json")
-DEFAULT_GUILD_ID = os.getenv("DEFAULT_GUILD_ID")
 
-app = FastAPI(title="Garden of Ashes API")
+def create_app() -> FastAPI:
+    load_dotenv()
 
-# Session middleware (needed for Discord OAuth + /auth/session)
-SECRET_KEY = os.getenv("SECRET_KEY", "change-me")
-add_session_middleware(app, secret_key=SECRET_KEY)
+    app = FastAPI(
+        title="Blood Script Bot API",
+        description="Backend API for the Blood Script Windows Dashboard",
+        version="1.0.0",
+    )
 
-# Static dashboard files
-app.mount(
-    "/dashboard",
-    StaticFiles(directory="dashboard", html=True),
-    name="dashboard",
-)
+    # CORS for the Windows Flutter app
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.allowed_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        allow_credentials=True,
+    )
 
-templates = Jinja2Templates(directory="templates")
+    # Session middleware (mostly legacy / harmless now)
+    secret_key = os.getenv("SECRET_KEY", "dev-session-key")
+    add_session_middleware(app, secret_key=secret_key)
 
+    # Routers
+    app.include_router(auth_router)
+    app.include_router(alerts_router)
 
-# -----------------------------------------------------
-# Startup / shutdown
-# -----------------------------------------------------
+    @app.get("/")
+    async def root():
+        return {"message": "Blood Script Bot API is running", "version": "1.0.0"}
 
-@app.on_event("startup")
-async def startup_event():
-    global DEFAULT_GUILD_ID
-
-    # Load main data store
-    data_store = load_data_from_file(DATA_PATH)
-    app.state.data_store = data_store
-
-    # Try to infer default guild if not configured
-    if not DEFAULT_GUILD_ID:
-        guilds = data_store.get("guilds", {})
-        if guilds:
-            DEFAULT_GUILD_ID = str(next(iter(guilds.keys())))
-            logger.info("Inferred DEFAULT_GUILD_ID=%s from data store.", DEFAULT_GUILD_ID)
-        else:
-            DEFAULT_GUILD_ID = "0"
-            logger.warning("DEFAULT_GUILD_ID not set and no guilds found; using '0'.")
-
-    app.state.default_guild_id = DEFAULT_GUILD_ID
-
-    # Zone registry for travel/map systems
-    zone_registry = ZoneRegistry()
-    try:
-        zone_registry.load()
-        logger.info("ZoneRegistry loaded from data/zones.json")
-    except FileNotFoundError:
-        logger.warning("No data/zones.json found. Run your zones sync command first.")
-    app.state.zone_registry = zone_registry
-
-    logger.info("Startup initialization complete.")
+    return app
 
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Persist any changes back to disk when the API shuts down."""
-    data_store = getattr(app.state, "data_store", None)
-    if data_store is not None:
-        save_data(DATA_PATH, data_store)
-        logger.info("Saved data store to %s", DATA_PATH)
-
-
-# -----------------------------------------------------
-# Routers
-# -----------------------------------------------------
-
-# Discord / auth endpoints + /auth/session
-app.include_router(auth_router)
-
-# Map API routes (zones, etc.)
-app.include_router(map_router)
-# Dashboard Alerts router
-app.include_router(alerts_router)
-
-# -----------------------------------------------------
-# Basic views
-# -----------------------------------------------------
-
-@app.get("/")
-async def root():
-    return {"message": "Garden of Ashes API is running"}
-
-
-@app.get("/map")
-async def map_view(request: Request):
-    """World map viewer – uses templates/map_view.html + static/map/map.js"""
-    return templates.TemplateResponse("map_view.html", {"request": request})
+app = create_app()

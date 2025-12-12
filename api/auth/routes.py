@@ -1,124 +1,109 @@
 # api/auth/routes.py
+from __future__ import annotations
 
-import os
-import secrets
-import string
-from urllib.parse import urlencode
+import jwt
+import httpx
+from fastapi import APIRouter, Depends, Header, HTTPException
 
-import requests
-from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.responses import RedirectResponse
-from pydantic import BaseModel
+from api.config import settings
+from api.models import OAuthRequest, Role, User
 
 router = APIRouter()
 
-# -------------------------------------------
-# Local admin login
-# -------------------------------------------
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-class LoginResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-
-@router.post("/auth/login", response_model=LoginResponse)
-async def admin_login(req: LoginRequest):
-    if req.username != "admin" or req.password != "admin":
-        raise HTTPException(401, "Invalid credentials")
-    return LoginResponse(access_token="admin.local.token")
+DISCORD_TOKEN_URL = "https://discord.com/api/oauth2/token"
+DISCORD_ME_URL = "https://discord.com/api/users/@me"
 
 
-# -------------------------------------------
-# Discord OAuth2 login
-# -------------------------------------------
-
-DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
-DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
-DISCORD_REDIRECT_URI = os.getenv(
-    "DISCORD_REDIRECT_URI",
-    "https://bloodscriptengine.tech/oauth/callback"
-)
-
-def require_oauth():
-    if not DISCORD_CLIENT_ID or not DISCORD_CLIENT_SECRET:
-        raise HTTPException(500, "Discord OAuth not configured")
-
-def make_state(request: Request):
-    state = "".join(secrets.choice(string.ascii_letters) for _ in range(32))
-    request.session["oauth_state"] = state
-    return state
-
-@router.get("/login")
-async def login_entry(request: Request):
-    return await discord_login(request)
-
-@router.get("/oauth/discord")
-async def discord_login(request: Request):
-    require_oauth()
-    state = make_state(request)
-    params = {
-        "client_id": DISCORD_CLIENT_ID,
-        "redirect_uri": DISCORD_REDIRECT_URI,
-        "response_type": "code",
-        "scope": "identify",
-        "state": state,
+def create_jwt(user: User) -> str:
+    payload = {
+        "sub": user.id,
+        "name": user.display_name,
+        "roles": [r.value for r in user.roles],
     }
-    url = "https://discord.com/oauth2/authorize?" + urlencode(params)
-    return RedirectResponse(url)
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
-@router.get("/oauth/callback")
-async def discord_callback(request: Request, code: str, state: str):
 
-    saved = request.session.get("oauth_state")
-    if not saved or saved != state:
-        raise HTTPException(400, "Invalid OAuth state")
+def parse_jwt(token: str) -> User:
+    try:
+        decoded = jwt.decode(
+            token,
+            settings.jwt_secret,
+            algorithms=[settings.jwt_algorithm],
+        )
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
-    token_data = {
-        "client_id": DISCORD_CLIENT_ID,
-        "client_secret": DISCORD_CLIENT_SECRET,
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": DISCORD_REDIRECT_URI
-    }
-
-    r = requests.post("https://discord.com/api/oauth2/token", data=token_data)
-    tokens = r.json()
-    access = tokens.get("access_token")
-
-    if not access:
-        raise HTTPException(400, "Discord token exchange failed")
-
-    u = requests.get(
-        "https://discord.com/api/users/@me",
-        headers={"Authorization": f"Bearer {access}"}
+    roles = [Role(r) for r in decoded.get("roles", [])]
+    return User(
+        id=str(decoded.get("sub")),
+        display_name=str(decoded.get("name")),
+        roles=roles,
     )
-    user = u.json()
 
-    request.session["user"] = {
-        "sub": user["id"],
-        "username": user["username"],
-        "avatar": f"https://cdn.discordapp.com/avatars/{user['id']}/{user.get('avatar')}.png",
-        "mode": "player",
+
+def get_current_user(authorization: str | None = Header(default=None)) -> User:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+    token = authorization.split(" ", 1)[1]
+    return parse_jwt(token)
+
+
+@router.post("/oauth/callback")
+async def oauth_callback(body: OAuthRequest) -> dict:
+    """
+    Called by the Windows app after Discord redirects back to
+    http://localhost:8765/callback and the app gets a ?code.
+    """
+    if body.redirect_uri != settings.redirect_uri:
+        raise HTTPException(status_code=400, detail="redirect_uri mismatch")
+
+    data = {
+        "client_id": settings.discord_client_id,
+        "client_secret": settings.discord_client_secret,
+        "grant_type": "authorization_code",
+        "code": body.code,
+        "redirect_uri": body.redirect_uri,
     }
 
-    return RedirectResponse("/dashboard/player.html")
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(DISCORD_TOKEN_URL, data=data)
+
+    if resp.status_code != 200:
+        raise HTTPException(
+            status_code=resp.status_code,
+            detail=f"Discord token error: {resp.text}",
+        )
+
+    token_data = resp.json()
+    discord_access_token = token_data.get("access_token")
+    if not discord_access_token:
+        raise HTTPException(status_code=500, detail="No access_token from Discord")
+
+    # Fetch Discord user
+    headers = {"Authorization": f"Bearer {discord_access_token}"}
+    async with httpx.AsyncClient() as client:
+        me_resp = await client.get(DISCORD_ME_URL, headers=headers)
+
+    if me_resp.status_code != 200:
+        raise HTTPException(
+            status_code=me_resp.status_code,
+            detail=f"Discord /users/@me error: {me_resp.text}",
+        )
+
+    me = me_resp.json()
+    user = User(
+        id=str(me["id"]),
+        display_name=me.get("global_name") or me.get("username") or "Discord User",
+        # You said: "Bot" and "all of them" – for now, give both roles.
+        roles=[Role.player, Role.st],
+    )
+
+    jwt_token = create_jwt(user)
+    return {"access_token": jwt_token, "user": user.dict()}
 
 
-# -------------------------------------------
-# Session check for dashboard JS
-# -------------------------------------------
-
-@router.get("/auth/session")
-async def get_session(request: Request):
-    u = request.session.get("user")
-    if not u:
-        return {"ok": False}
-    return {"ok": True, "session": u}
-
-@router.post("/auth/logout")
-async def logout(request: Request):
-    request.session.clear()
-    return {"ok": True}
+@router.get("/me", response_model=User)
+async def me(user: User = Depends(get_current_user)) -> User:
+    """Used by the Windows app to test the JWT + show who is logged in."""
+    return user
