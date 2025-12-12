@@ -1,51 +1,45 @@
-# api/main.py
-import logging
-import os
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import httpx
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
+app = FastAPI()
 
-from api.alert_routes import router as alerts_router
-from api.auth.routes import router as auth_router
-from api.auth.session import add_session_middleware
-from api.config import settings
+class OAuthPayload(BaseModel):
+    code: str
+    redirect_uri: str
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+DISCORD_TOKEN_URL = "https://discord.com/api/oauth2/token"
+DISCORD_ME_URL = "https://discord.com/api/users/@me"
 
+@app.post("/oauth/callback")
+async def oauth_callback(payload: OAuthPayload):
+    data = {
+        "client_id": "<YOUR_CLIENT_ID>",
+        "client_secret": "<YOUR_CLIENT_SECRET>",
+        "grant_type": "authorization_code",
+        "code": payload.code,
+        "redirect_uri": payload.redirect_uri,
+    }
 
-def create_app() -> FastAPI:
-    load_dotenv()
+    async with httpx.AsyncClient() as client:
+        token_res = await client.post(DISCORD_TOKEN_URL, data=data)
 
-    app = FastAPI(
-        title="Blood Script Bot API",
-        description="Backend API for the Blood Script Windows Dashboard",
-        version="1.0.0",
-    )
+    if token_res.status_code != 200:
+        raise HTTPException(status_code=400, detail=token_res.text)
 
-    # CORS for the Windows Flutter app
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.allowed_origins,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        allow_credentials=True,
-    )
+    token_json = token_res.json()
+    access_token = token_json.get("access_token")
 
-    # Session middleware (mostly legacy / harmless now)
-    secret_key = os.getenv("SECRET_KEY", "dev-session-key")
-    add_session_middleware(app, secret_key=secret_key)
+    if not access_token:
+        raise HTTPException(status_code=400, detail="No access_token from Discord")
 
-    # Routers
-    app.include_router(auth_router)
-    app.include_router(alerts_router)
+    async with httpx.AsyncClient() as client:
+        user_res = await client.get(
+            DISCORD_ME_URL,
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
 
-    @app.get("/")
-    async def root():
-        return {"message": "Blood Script Bot API is running", "version": "1.0.0"}
-
-    return app
-
-
-app = create_app()
+    return {
+        "access_token": access_token,
+        "user": user_res.json(),
+    }
