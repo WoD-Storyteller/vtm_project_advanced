@@ -1,45 +1,72 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import httpx
+# api/main.py
 
-app = FastAPI()
+import logging
+import os
 
-class OAuthPayload(BaseModel):
-    code: str
-    redirect_uri: str
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 
-DISCORD_TOKEN_URL = "https://discord.com/api/oauth2/token"
-DISCORD_ME_URL = "https://discord.com/api/users/@me"
+# --- Load environment variables ---
+load_dotenv()
 
-@app.post("/oauth/callback")
-async def oauth_callback(payload: OAuthPayload):
-    data = {
-        "client_id": "<YOUR_CLIENT_ID>",
-        "client_secret": "<YOUR_CLIENT_SECRET>",
-        "grant_type": "authorization_code",
-        "code": payload.code,
-        "redirect_uri": payload.redirect_uri,
-    }
+# --- Logging ---
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("vtm_api")
 
-    async with httpx.AsyncClient() as client:
-        token_res = await client.post(DISCORD_TOKEN_URL, data=data)
+# --- App ---
+app = FastAPI(
+    title="Blood Script Engine API",
+    version="1.0.0",
+)
 
-    if token_res.status_code != 200:
-        raise HTTPException(status_code=400, detail=token_res.text)
+# --- CORS (Flutter + localhost + domain) ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost",
+        "http://localhost:8765",
+        "https://bloodscriptengine.tech",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-    token_json = token_res.json()
-    access_token = token_json.get("access_token")
+# =====================================================
+# ROUTE REGISTRATION
+# =====================================================
 
-    if not access_token:
-        raise HTTPException(status_code=400, detail="No access_token from Discord")
+# Auth / OAuth / Session
+from api.auth.routes import router as auth_router
+from api.auth.session import add_session_middleware
 
-    async with httpx.AsyncClient() as client:
-        user_res = await client.get(
-            DISCORD_ME_URL,
-            headers={"Authorization": f"Bearer {access_token}"}
-        )
+add_session_middleware(
+    app,
+    secret_key=os.getenv("SECRET_KEY", "dev-secret"),
+)
 
+app.include_router(auth_router, prefix="/auth", tags=["auth"])
+
+# Alerts (player + ST)
+from api.alert_routes import router as alerts_router
+app.include_router(alerts_router, tags=["alerts"])
+
+# Maps / Director state
+from api.map_routes import router as map_router
+app.include_router(map_router, tags=["maps"])
+
+# =====================================================
+# ROOT / HEALTH
+# =====================================================
+
+@app.get("/")
+async def root():
     return {
-        "access_token": access_token,
-        "user": user_res.json(),
+        "status": "ok",
+        "service": "Blood Script Engine API",
     }
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
